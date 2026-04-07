@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PlovdivTransit</string>
+    <string name="geoapify_api_key">4bc61aef65674ca992709581bef93e81</string>
+</resources>

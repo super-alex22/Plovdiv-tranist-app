@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "346987936734",
+    "project_id": "plovdiv-mobility",
+    "storage_bucket": "plovdiv-mobility.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:346987936734:android:010f205ddc317b8b79fb4f",
+        "android_client_info": {
+          "package_name": "com.example.plovdivtransit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkObLqKp9c6PpqMIqqPbr3E0O2AJwEXtc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
