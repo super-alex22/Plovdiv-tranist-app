@@ -1,6 +1,7 @@
 package com.example.plovdivtransit
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.osmdroid.util.GeoPoint
@@ -36,18 +37,20 @@ class GtfsRepository(private val context: Context) {
     fun loadShapes(): Map<String, List<GeoPoint>> {
         cachedShapes?.let { return it }
 
-        val loaded = readShapesFile()
-            .lineSequence()
-            .drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val parts = parseCsvLine(line)
-                if (parts.size < 4) return@mapNotNull null
+        val content = readShapesFile()
+        if (content.isBlank()) return emptyMap()
+        val lines = content.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) return emptyMap()
 
-                val shapeId = parts[0].replace("\"", "")
-                val lat = parts[1].toDoubleOrNull() ?: return@mapNotNull null
-                val lon = parts[2].toDoubleOrNull() ?: return@mapNotNull null
-                val sequence = parts[3].toIntOrNull() ?: 0
+        val headerMap = csvHeaderMap(lines[0])
+
+        val loaded = lines.drop(1)
+            .mapNotNull { line ->
+                val parts = parseCsv(line)
+                val shapeId = value(parts, headerMap, "shape_id") ?: return@mapNotNull null
+                val lat = value(parts, headerMap, "shape_pt_lat")?.toDoubleOrNull() ?: return@mapNotNull null
+                val lon = value(parts, headerMap, "shape_pt_lon")?.toDoubleOrNull() ?: return@mapNotNull null
+                val sequence = value(parts, headerMap, "shape_pt_sequence")?.toIntOrNull() ?: 0
 
                 shapeId to (sequence to GeoPoint(lat, lon))
             }
@@ -56,6 +59,7 @@ class GtfsRepository(private val context: Context) {
                 entry.value.sortedBy { it.first }.map { it.second }
             }
 
+        Log.d("GTFS", "loaded shapes count: ${loaded.size}")
         cachedShapes = loaded
         return loaded
     }
@@ -63,22 +67,25 @@ class GtfsRepository(private val context: Context) {
     fun loadTrips(): List<GtfsTrip> {
         cachedTrips?.let { return it }
 
-        val loaded = readTripsFile()
-            .lineSequence()
-            .drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val parts = parseCsvLine(line)
-                if (parts.size < 3) return@mapNotNull null
+        val content = readTripsFile()
+        if (content.isBlank()) return emptyList()
+        val lines = content.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) return emptyList()
 
+        val headerMap = csvHeaderMap(lines[0])
+
+        val loaded = lines.drop(1)
+            .mapNotNull { line ->
+                val parts = parseCsv(line)
                 GtfsTrip(
-                    routeId = parts[0].replace("\"", ""),
-                    tripId = parts[2].replace("\"", ""),
-                    shapeId = if (parts.size > 4) parts[4].replace("\"", "") else null
+                    routeId = value(parts, headerMap, "route_id") ?: return@mapNotNull null,
+                    tripId = value(parts, headerMap, "trip_id") ?: return@mapNotNull null,
+                    shapeId = value(parts, headerMap, "shape_id")
                 )
             }
             .toList()
 
+        Log.d("GTFS", "loaded trips count: ${loaded.size}")
         cachedTrips = loaded
         return loaded
     }
@@ -92,21 +99,24 @@ class GtfsRepository(private val context: Context) {
     fun loadRoutes(): List<GtfsRoute> {
         cachedRoutes?.let { return it }
 
-        val loaded = readRoutesFile()
-            .lineSequence()
-            .drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val parts = parseCsvLine(line)
-                if (parts.size < 5) return@mapNotNull null
+        val content = readRoutesFile()
+        if (content.isBlank()) return emptyList()
+        val lines = content.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) return emptyList()
 
+        val headerMap = csvHeaderMap(lines[0])
+
+        val loaded = lines.drop(1)
+            .mapNotNull { line ->
+                val parts = parseCsv(line)
                 GtfsRoute(
-                    routeId = parts[0].replace("\"", ""),
-                    routeShortName = parts[4].replace("\"", "")
+                    routeId = value(parts, headerMap, "route_id") ?: return@mapNotNull null,
+                    routeShortName = value(parts, headerMap, "route_short_name") ?: ""
                 )
             }
             .toList()
 
+        Log.d("GTFS", "loaded routes count: ${loaded.size}")
         cachedRoutes = loaded
         return loaded
     }
@@ -114,19 +124,21 @@ class GtfsRepository(private val context: Context) {
     fun loadStopTimes(): List<GtfsStopTime> {
         cachedStopTimes?.let { return it }
 
-        val loaded = readStopTimesFile()
-            .lineSequence()
-            .drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val parts = parseCsvLine(line)
-                if (parts.size < 5) return@mapNotNull null
+        val content = readStopTimesFile()
+        if (content.isBlank()) return emptyList()
+        val lines = content.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) return emptyList()
 
-                val tripId = parts[0].replace("\"", "")
-                val stopId = parts[1].replace("\"", "")
-                val arrivalTime = parts[2].replace("\"", "")
-                val departureTime = parts[3].replace("\"", "")
-                val stopSequence = parts[4].replace("\"", "").toIntOrNull() ?: return@mapNotNull null
+        val headerMap = csvHeaderMap(lines[0])
+
+        val loaded = lines.drop(1)
+            .mapNotNull { line ->
+                val parts = parseCsv(line)
+                val tripId = value(parts, headerMap, "trip_id") ?: return@mapNotNull null
+                val stopId = value(parts, headerMap, "stop_id") ?: return@mapNotNull null
+                val arrivalTime = value(parts, headerMap, "arrival_time") ?: return@mapNotNull null
+                val departureTime = value(parts, headerMap, "departure_time") ?: return@mapNotNull null
+                val stopSequence = value(parts, headerMap, "stop_sequence")?.toIntOrNull() ?: return@mapNotNull null
 
                 GtfsStopTime(
                     tripId = tripId,
@@ -138,6 +150,7 @@ class GtfsRepository(private val context: Context) {
             }
             .toList()
 
+        Log.d("GTFS", "loaded stop_times count: ${loaded.size}")
         cachedStopTimes = loaded
         return loaded
     }
@@ -151,19 +164,21 @@ class GtfsRepository(private val context: Context) {
     fun loadStops(): List<GtfsStop> {
         cachedStops?.let { return it }
 
-        val loaded = readStopsFile()
-            .lineSequence()
-            .drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val parts = parseCsvLine(line)
-                if (parts.size < 5) return@mapNotNull null
+        val content = readStopsFile()
+        if (content.isBlank()) return emptyList()
+        val lines = content.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) return emptyList()
 
-                val stopId = parts[0].replace("\"", "")
-                val stopCode = parts[1].replace("\"", "").ifBlank { null }
-                val stopName = parts[2].replace("\"", "")
-                val stopLat = parts[3].replace("\"", "").toDoubleOrNull() ?: return@mapNotNull null
-                val stopLon = parts[4].replace("\"", "").toDoubleOrNull() ?: return@mapNotNull null
+        val headerMap = csvHeaderMap(lines[0])
+
+        val loaded = lines.drop(1)
+            .mapNotNull { line ->
+                val parts = parseCsv(line)
+                val stopId = value(parts, headerMap, "stop_id") ?: return@mapNotNull null
+                val stopCode = value(parts, headerMap, "stop_code")?.ifBlank { null }
+                val stopName = value(parts, headerMap, "stop_name") ?: return@mapNotNull null
+                val stopLat = value(parts, headerMap, "stop_lat")?.toDoubleOrNull() ?: return@mapNotNull null
+                val stopLon = value(parts, headerMap, "stop_lon")?.toDoubleOrNull() ?: return@mapNotNull null
 
                 GtfsStop(
                     stopId = stopId,
@@ -175,6 +190,7 @@ class GtfsRepository(private val context: Context) {
             }
             .toList()
 
+        Log.d("GTFS", "loaded stops count: ${loaded.size}")
         cachedStops = loaded
         return loaded
     }
@@ -286,14 +302,14 @@ class GtfsRepository(private val context: Context) {
         return toMinutes(endTime) - toMinutes(startTime)
     }
 
-    private fun parseCsvLine(line: String): List<String> {
+    private fun parseCsv(line: String): List<String> {
         val result = mutableListOf<String>()
         val current = StringBuilder()
         var inQuotes = false
 
         for (char in line) {
             when (char) {
-                '"' -> inQuotes = !inQuotes
+                '\"' -> inQuotes = !inQuotes
                 ',' -> {
                     if (inQuotes) {
                         current.append(char)
@@ -310,11 +326,38 @@ class GtfsRepository(private val context: Context) {
         return result
     }
 
+    private fun csvHeaderMap(headerLine: String): Map<String, Int> {
+        return parseCsv(headerLine)
+            .mapIndexed { index, s -> s.replace("\"", "").trim() to index }
+            .toMap()
+    }
+
+    private fun value(parts: List<String>, headerMap: Map<String, Int>, columnName: String): String? {
+        val index = headerMap[columnName] ?: return null
+        if (index >= parts.size) return null
+        return parts[index].replace("\"", "").trim()
+    }
+
     private fun cleanStopName(name: String): String {
         return name
             .split(" - ")
             .first()
             .trim()
+    }
+
+    private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371e3
+        val phi1 = Math.toRadians(lat1)
+        val phi2 = Math.toRadians(lat2)
+        val deltaPhi = Math.toRadians(lat2 - lat1)
+        val deltaLambda = Math.toRadians(lon2 - lon1)
+
+        val a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+        return r * c
     }
 
     suspend fun findBestRouteOptions(
@@ -323,33 +366,43 @@ class GtfsRepository(private val context: Context) {
         destLat: Double,
         destLon: Double
     ): List<GtfsRouteOption> = withContext(Dispatchers.IO) {
+        Log.d("GTFS_ROUTE", "Planning route from ($startLat, $startLon) to ($destLat, $destLon)")
         val allStops = loadStops()
+        Log.d("GTFS_ROUTE", "Total stops loaded: ${allStops.size}")
 
         val startStops = allStops
-            .sortedBy { distanceMeters(startLat, startLon, it.stopLat, it.stopLon) }
+            .map { it to distanceMeters(startLat, startLon, it.stopLat, it.stopLon) }
+            .sortedBy { it.second }
             .take(15)
+        
+        Log.d("GTFS_ROUTE", "Nearby start stops found: ${startStops.size}")
 
         val endStops = allStops
-            .sortedBy { distanceMeters(destLat, destLon, it.stopLat, it.stopLon) }
+            .map { it to distanceMeters(destLat, destLon, it.stopLat, it.stopLon) }
+            .sortedBy { it.second }
             .take(15)
+            
+        Log.d("GTFS_ROUTE", "Nearby destination stops found: ${endStops.size}")
 
         val options = mutableListOf<GtfsRouteOption>()
+        var pairsChecked = 0
+        var directTripsFound = 0
 
-        for (sStop in startStops) {
-            for (eStop in endStops) {
+        for ((sStop, sDist) in startStops) {
+            for ((eStop, eDist) in endStops) {
+                pairsChecked++
+                // Log.v("GTFS_ROUTE", "Checking pair: ${sStop.stopName} -> ${eStop.stopName}")
                 val direct = findDirectTripBetweenStops(sStop.stopId, eStop.stopId)
 
                 if (direct != null) {
-                    val walkTo = (distanceMeters(startLat, startLon, sStop.stopLat, sStop.stopLon) / 80.0)
-                        .toInt()
-                        .coerceAtLeast(1)
+                    directTripsFound++
+                    Log.d("GTFS_ROUTE", "Found direct trip: Bus ${direct.routeShortName} from ${sStop.stopName} to ${eStop.stopName}")
+                    val walkTo = (sDist / 80.0).toInt().coerceAtLeast(1)
 
                     val rawBusMin = minutesBetweenTimes(direct.startDepartureTime, direct.endArrivalTime)
                     val busMin = if (rawBusMin > 0) rawBusMin else 15
 
-                    val walkFrom = (distanceMeters(eStop.stopLat, eStop.stopLon, destLat, destLon) / 80.0)
-                        .toInt()
-                        .coerceAtLeast(1)
+                    val walkFrom = (eDist / 80.0).toInt().coerceAtLeast(1)
 
                     options.add(
                         GtfsRouteOption(
@@ -368,9 +421,14 @@ class GtfsRepository(private val context: Context) {
             }
         }
 
-        options
+        Log.d("GTFS_ROUTE", "Search completed. Pairs checked: $pairsChecked, Direct trips found: $directTripsFound")
+
+        val result = options
             .distinctBy { "${it.routeShortName}_${it.startStop.stopId}_${it.endStop.stopId}" }
             .sortedBy { it.totalMinutes + (it.walkToStopMinutes + it.walkToDestMinutes) * 0.5 }
             .take(3)
+        
+        Log.d("GTFS_ROUTE", "Final route options count: ${result.size}")
+        result
     }
 }

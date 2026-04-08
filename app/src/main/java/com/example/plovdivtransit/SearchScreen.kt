@@ -46,6 +46,103 @@ data class PlaceSearchResult(
     val lon: Double
 )
 
+fun normalizeSearchText(text: String): String {
+    return text
+        .lowercase()
+        .trim()
+        .replace(Regex("\\s+"), " ")
+}
+
+fun transliterateBgToLatin(text: String): String {
+    return buildString {
+        for (ch in text.lowercase()) {
+            append(
+                when (ch) {
+                    'а' -> "a"
+                    'б' -> "b"
+                    'в' -> "v"
+                    'г' -> "g"
+                    'д' -> "d"
+                    'е' -> "e"
+                    'ж' -> "zh"
+                    'з' -> "z"
+                    'и' -> "i"
+                    'й' -> "y"
+                    'к' -> "k"
+                    'л' -> "l"
+                    'м' -> "m"
+                    'н' -> "n"
+                    'о' -> "o"
+                    'п' -> "p"
+                    'р' -> "r"
+                    'с' -> "s"
+                    'т' -> "t"
+                    'у' -> "u"
+                    'ф' -> "f"
+                    'х' -> "h"
+                    'ц' -> "ts"
+                    'ч' -> "ch"
+                    'ш' -> "sh"
+                    'щ' -> "sht"
+                    'ъ' -> "a"
+                    'ь' -> ""
+                    'ю' -> "yu"
+                    'я' -> "ya"
+                    else -> ch.toString()
+                }
+            )
+        }
+    }
+}
+
+fun transliterateLatinToBgLike(text: String): String {
+    return text
+        .lowercase()
+        .replace("sht", "щ")
+        .replace("sh", "ш")
+        .replace("ch", "ч")
+        .replace("zh", "ж")
+        .replace("ts", "ц")
+        .replace("yu", "ю")
+        .replace("ya", "я")
+        .replace("a", "а")
+        .replace("b", "б")
+        .replace("v", "в")
+        .replace("g", "г")
+        .replace("d", "д")
+        .replace("e", "е")
+        .replace("z", "з")
+        .replace("i", "и")
+        .replace("y", "й")
+        .replace("k", "к")
+        .replace("l", "л")
+        .replace("m", "м")
+        .replace("n", "н")
+        .replace("o", "о")
+        .replace("p", "п")
+        .replace("r", "р")
+        .replace("s", "с")
+        .replace("t", "т")
+        .replace("u", "у")
+        .replace("f", "ф")
+        .replace("h", "х")
+}
+
+fun matchesSearch(source: String, query: String): Boolean {
+    val normalizedSource = normalizeSearchText(source)
+    val normalizedQuery = normalizeSearchText(query)
+
+    val sourceLatin = transliterateBgToLatin(normalizedSource)
+    val queryLatin = transliterateBgToLatin(normalizedQuery)
+
+    val sourceBgLike = transliterateLatinToBgLike(normalizedSource)
+    val queryBgLike = transliterateLatinToBgLike(normalizedQuery)
+
+    return normalizedSource.contains(normalizedQuery) ||
+            sourceLatin.contains(queryLatin) ||
+            sourceBgLike.contains(queryBgLike)
+}
+
 @Composable
 fun SearchDestinationScreen(
     userLat: Double? = null,
@@ -73,57 +170,69 @@ fun SearchDestinationScreen(
         isSearching = true
 
         try {
-            android.util.Log.d("SEARCH_UI", "Starting Geoapify search")
+            android.util.Log.d("SEARCH_UI", "Starting search block")
             suggestions = withContext(Dispatchers.IO) {
-                val localPopular = PopularPlaces.items
-                    .filter {
-                        it.name.contains(query, ignoreCase = true) ||
-                                it.keywords.any { keyword ->
-                                    keyword.contains(query, ignoreCase = true)
-                                }
-                    }
-                    .map {
-                        PlaceSearchResult(
-                            name = it.name,
-                            lat = it.lat,
-                            lon = it.lon
-                        )
-                    }
-
-                val localStops = gtfsRepository.loadStops()
-                    .filter { it.stopName.contains(query, ignoreCase = true) }
-                    .map {
-                        PlaceSearchResult(
-                            name = it.stopName,
-                            lat = it.stopLat,
-                            lon = it.stopLon
-                        )
-                    }
-
-                val remoteResults = geoapifyRepository.searchPlaces(
-                    query = query,
-                    userLat = userLat,
-                    userLon = userLon
-                ).map {
-                    PlaceSearchResult(
-                        name = it.name,
-                        lat = it.lat,
-                        lon = it.lon
-                    )
+                android.util.Log.d("SEARCH_UI", "Inside withContext(IO)")
+                
+                val localPopular = try {
+                    PopularPlaces.items
+                        .filter {
+                            matchesSearch(it.name, query)    ||
+                                    it.keywords.any { keyword ->
+                                        matchesSearch(keyword, query)
+                                    }
+                        }
+                        .map {
+                            PlaceSearchResult(
+                                name = it.name,
+                                lat = it.lat,
+                                lon = it.lon
+                            )
+                        }.also {
+                            android.util.Log.d("SEARCH_UI", "localPopular count = ${it.size}")
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("SEARCH_UI", "localPopular failed", e)
+                    emptyList<PlaceSearchResult>()
                 }
 
-                val combined = (localPopular + localStops + remoteResults)
-                    .distinctBy { it.name.lowercase() }
+                val localStops = try {
+                    gtfsRepository.loadStops()
+                        .filter { matchesSearch(it.stopName, query) }
+                        .map {
+                            PlaceSearchResult(
+                                name = it.stopName,
+                                lat = it.stopLat,
+                                lon = it.stopLon
+                            )
+                        }.also {
+                            android.util.Log.d("SEARCH_UI", "localStops count = ${it.size}")
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("SEARCH_UI", "localStops failed", e)
+                    emptyList<PlaceSearchResult>()
+                }
 
-                if (userLat != null && userLon != null) {
+                // Temporary: Disable Geoapify completely
+                val remoteResults = emptyList<PlaceSearchResult>()
+                android.util.Log.d("SEARCH_UI", "remoteResults count = 0 (disabled)")
+
+                val combined = (localPopular + localStops + remoteResults)
+                    .distinctBy { normalizeSearchText(transliterateBgToLatin(it.name)) }
+
+                android.util.Log.d("SEARCH_UI", "combined count = ${combined.size}")
+
+                val result = if (userLat != null && userLon != null) {
                     combined.sortedBy { distanceMeters(userLat, userLon, it.lat, it.lon) }
                 } else {
                     combined
                 }
+                android.util.Log.d("SEARCH_UI", "Final result size: ${result.size}")
+                result
             }
             android.util.Log.d("SEARCH_UI", "Suggestions received: ${suggestions.size}")
         } catch (e: Exception) {
-            android.util.Log.e("SEARCH_UI", "Search failed", e)
+            android.util.Log.e("SEARCH_UI", "Search outer block failed", e)
             suggestions = emptyList()
         } finally {
             isSearching = false

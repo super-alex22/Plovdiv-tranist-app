@@ -878,6 +878,7 @@ fun RouteMapScreen(
             mapView.overlays.clear()
 
             if (selectedRoute != null) {
+                android.util.Log.d("ROUTING", "Rendering selected route: Bus ${selectedRoute.routeShortName}")
                 val startStop = GeoPoint(selectedRoute.startStop.stopLat, selectedRoute.startStop.stopLon)
                 val endStop = GeoPoint(selectedRoute.endStop.stopLat, selectedRoute.endStop.stopLon)
 
@@ -891,8 +892,11 @@ fun RouteMapScreen(
                 
                 // 2. Bus segment
                 val busPoints = if (gtfsRepository != null && selectedRoute.shapeId != null) {
-                    gtfsRepository.getShapePoints(selectedRoute.shapeId, selectedRoute.startStop, selectedRoute.endStop)
+                    val points = gtfsRepository.getShapePoints(selectedRoute.shapeId, selectedRoute.startStop, selectedRoute.endStop)
+                    android.util.Log.d("ROUTING", "Found ${points.size} shape points for shapeId ${selectedRoute.shapeId}")
+                    points
                 } else {
+                    android.util.Log.d("ROUTING", "No shapeId or repository, using direct stop-to-stop line.")
                     emptyList()
                 }
 
@@ -913,22 +917,29 @@ fun RouteMapScreen(
                     outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
+                // Start stop marker
+                val startStopMarker = Marker(mapView).apply {
+                    position = startStop
+                    title = "Pickup: ${selectedRoute.startStop.stopName}"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    // You could set a custom bus icon here
+                }
+
+                // End stop marker
+                val endStopMarker = Marker(mapView).apply {
+                    position = endStop
+                    title = "Dropoff: ${selectedRoute.endStop.stopName}"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                }
+
                 mapView.overlays.add(walk1)
                 mapView.overlays.add(busLine)
                 mapView.overlays.add(walk2)
+                mapView.overlays.add(startStopMarker)
+                mapView.overlays.add(endStopMarker)
             } else {
-                // Fallback to direct route if no GTFS option selected
-                val routeLine = Polyline().apply {
-                    setPoints(
-                        if (routeData?.points?.isNotEmpty() == true) {
-                            routeData.points
-                        } else {
-                            listOf(fromPoint, toPoint)
-                        }
-                    )
-                    outlinePaint.strokeWidth = 8f
-                }
-                mapView.overlays.add(routeLine)
+                android.util.Log.d("ROUTING", "No selected GTFS route. Not drawing any transit line.")
+                // No transit route selected -> No line between fromPoint and toPoint
             }
 
             val fromMarker = Marker(mapView).apply {
@@ -1124,18 +1135,29 @@ fun SuggestedRoutesScreen(
 
     LaunchedEffect(destination, userLocation) {
         if (destination == null || userLocation == null) {
+            android.util.Log.d("ROUTING", "No destination or location, skipping search.")
             routeOptions = emptyList()
             return@LaunchedEffect
         }
 
         isLoadingRoutes = true
+        android.util.Log.d("ROUTING", "Searching for GTFS routes from (${userLocation.lat}, ${userLocation.lon}) to (${destination.lat}, ${destination.lon})")
 
-        routeOptions = gtfsRepository.findBestRouteOptions(
-            startLat = userLocation.lat,
-            startLon = userLocation.lon,
-            destLat = destination.lat,
-            destLon = destination.lon
-        )
+        try {
+            routeOptions = gtfsRepository.findBestRouteOptions(
+                startLat = userLocation.lat,
+                startLon = userLocation.lon,
+                destLat = destination.lat,
+                destLon = destination.lon
+            )
+            android.util.Log.d("ROUTING", "Found ${routeOptions.size} route options.")
+            routeOptions.forEachIndexed { i, opt ->
+                android.util.Log.d("ROUTING", "Option $i: Bus ${opt.routeShortName} from ${opt.startStop.stopName} to ${opt.endStop.stopName} (${opt.totalMinutes} min)")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ROUTING", "Error finding GTFS routes", e)
+            routeOptions = emptyList()
+        }
 
         isLoadingRoutes = false
     }
