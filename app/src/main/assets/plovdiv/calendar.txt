@@ -1,2 +1,2 @@
 "service_id","monday","tuesday","wednesday","thursday","friday","saturday","sunday","start_date","end_date"
-"HOLIDAY",1,1,1,1,1,0,0,"20260405","20261231"
+"HOLIDAY",1,1,1,1,1,0,0,"20260407","20261231"
