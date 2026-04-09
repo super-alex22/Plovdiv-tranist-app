@@ -120,6 +120,10 @@ data class UserLocation(
     val lat: Double,
     val lon: Double
 )
+data class ShapePointLite(
+    val lat: Double,
+    val lon: Double
+)
 private val GRAND_HOTEL_PLOVDIV = UserLocation(42.1557, 24.7461)
 data class BusStop(
     val name: String,
@@ -1861,7 +1865,26 @@ fun GoScreen(
     var lastUserLocation by remember(selectedRoute) {
         mutableStateOf<UserLocation?>(null)
     }
+    val context = LocalContext.current
+    val gtfsRepository = remember { GtfsRepository(context) }
 
+    val segmentShapePoints = remember(selectedRoute) {
+        selectedRoute?.segments
+            ?.mapIndexed { index, seg ->
+                val points = if (seg.shapeId != null) {
+                    gtfsRepository.getShapePoints(
+                        seg.shapeId,
+                        seg.fromStop,
+                        seg.toStop
+                    ).map { ShapePointLite(it.latitude, it.longitude) }
+                } else {
+                    emptyList()
+                }
+                index to points
+            }
+            ?.toMap()
+            ?: emptyMap()
+    }
     LaunchedEffect(userLocation, selectedRoute, destination) {
         if (userLocation != null) {
             currentGuidanceState = GuidanceEngine.resolve(
@@ -1869,7 +1892,8 @@ fun GoScreen(
                 userLoc = userLocation,
                 destination = destination,
                 previousStep = currentGuidanceState,
-                previousUserLoc = lastUserLocation
+                previousUserLoc = lastUserLocation,
+                segmentShapePoints = segmentShapePoints
             )
             lastUserLocation = userLocation
         }

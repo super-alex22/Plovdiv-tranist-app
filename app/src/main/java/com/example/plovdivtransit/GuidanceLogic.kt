@@ -42,7 +42,8 @@ object GuidanceEngine {
         userLoc: UserLocation?,
         destination: PlaceSearchResult?,
         previousStep: GuidanceStep? = null,
-        previousUserLoc: UserLocation? = null
+        previousUserLoc: UserLocation? = null,
+        segmentShapePoints: Map<Int, List<ShapePointLite>> = emptyMap()
     ): GuidanceStep {
         if (route == null || destination == null || userLoc == null) {
             return previousStep ?: GuidanceStep(
@@ -62,7 +63,8 @@ object GuidanceEngine {
             userLoc = userLoc,
             destination = destination,
             previousStep = previousStep,
-            previousUserLoc = previousUserLoc
+            previousUserLoc = previousUserLoc,
+            segmentShapePoints = segmentShapePoints
         )
 
         if (previousStep == null || previousStep.phase == GuidancePhase.NoRoute) {
@@ -112,7 +114,8 @@ object GuidanceEngine {
         userLoc: UserLocation,
         destination: PlaceSearchResult,
         previousStep: GuidanceStep? = null,
-        previousUserLoc: UserLocation? = null
+        previousUserLoc: UserLocation? = null,
+        segmentShapePoints: Map<Int, List<ShapePointLite>> = emptyMap()
     ): GuidanceStep {
         val segments = route.segments
 
@@ -167,14 +170,24 @@ object GuidanceEngine {
                 seg.toStop.stopLon
             )
 
-            val distToLine = distanceToSegment(
-                userLoc.lat,
-                userLoc.lon,
-                seg.fromStop.stopLat,
-                seg.fromStop.stopLon,
-                seg.toStop.stopLat,
-                seg.toStop.stopLon
-            )
+            val shapePoints = segmentShapePoints[i]
+
+            val distToLine = if (shapePoints != null && shapePoints.size >= 2) {
+                distanceToPolyline(
+                    userLoc.lat,
+                    userLoc.lon,
+                    shapePoints
+                )
+            } else {
+                distanceToSegment(
+                    userLoc.lat,
+                    userLoc.lon,
+                    seg.fromStop.stopLat,
+                    seg.fromStop.stopLon,
+                    seg.toStop.stopLat,
+                    seg.toStop.stopLon
+                )
+            }
 
             val movedMeters = if (previousUserLoc != null) {
                 distanceBetween(
@@ -241,10 +254,7 @@ object GuidanceEngine {
 
             val isNearRouteLine = distToLine <= RIDE_CORRIDOR_RADIUS_METERS
             val movedEnough = movedMeters >= 25.0
-            android.util.Log.d(
-                "GUIDANCE_DEBUG",
-                "phase=${previousStep?.phase}, moved=$movedMeters, distToStart=$distToStart, distToEnd=$distToEnd, distToLine=$distToLine"
-            )
+
             val canStartRiding =
                 (
                         previousStep?.phase == GuidancePhase.WaitingForVehicle ||
@@ -265,6 +275,7 @@ object GuidanceEngine {
                         distToEnd > 30.0 &&
                         distToStart > WAIT_RADIUS_METERS + 10.0 &&
                         movedMeters >= 8.0
+
             val leftRouteWhileRiding =
                 previousStep?.phase == GuidancePhase.RidingVehicle &&
                         (!isNearRouteLine || distToStart <= WAIT_RADIUS_METERS)
@@ -279,8 +290,8 @@ object GuidanceEngine {
                     i
                 )
             }
+
             if (canStartRiding || stayRiding) {
-                android.util.Log.d("GUIDANCE_DEBUG", "Riding triggered for segment $i")
                 return GuidanceStep(
                     GuidancePhase.RidingVehicle,
                     "Riding Bus ${seg.routeShortName}",
@@ -316,6 +327,35 @@ object GuidanceEngine {
                 0
             )
         }
+    }
+    private fun distanceToPolyline(
+        userLat: Double,
+        userLon: Double,
+        points: List<ShapePointLite>
+    ): Double {
+        if (points.size < 2) return Double.MAX_VALUE
+
+        var minDistance = Double.MAX_VALUE
+
+        for (j in 0 until points.size - 1) {
+            val p1 = points[j]
+            val p2 = points[j + 1]
+
+            val dist = distanceToSegment(
+                userLat,
+                userLon,
+                p1.lat,
+                p1.lon,
+                p2.lat,
+                p2.lon
+            )
+
+            if (dist < minDistance) {
+                minDistance = dist
+            }
+        }
+
+        return minDistance
     }
     private fun distanceToSegment(
         lat: Double, lon: Double,
