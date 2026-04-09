@@ -226,9 +226,11 @@ object GuidanceEngine {
                 } else {
                     GuidancePhase.WaitingForTransferVehicle
                 }
+                android.util.Log.d("GUIDANCE_DEBUG", "Wait triggered for segment $i")
 
                 return GuidanceStep(
                     phase,
+
                     "Wait for Bus ${seg.routeShortName}",
                     "At ${seg.fromStop.stopName}",
                     "wait",
@@ -239,7 +241,10 @@ object GuidanceEngine {
 
             val isNearRouteLine = distToLine <= RIDE_CORRIDOR_RADIUS_METERS
             val movedEnough = movedMeters >= 25.0
-
+            android.util.Log.d(
+                "GUIDANCE_DEBUG",
+                "phase=${previousStep?.phase}, moved=$movedMeters, distToStart=$distToStart, distToEnd=$distToEnd, distToLine=$distToLine"
+            )
             val canStartRiding =
                 (
                         previousStep?.phase == GuidancePhase.WaitingForVehicle ||
@@ -275,6 +280,7 @@ object GuidanceEngine {
                 )
             }
             if (canStartRiding || stayRiding) {
+                android.util.Log.d("GUIDANCE_DEBUG", "Riding triggered for segment $i")
                 return GuidanceStep(
                     GuidancePhase.RidingVehicle,
                     "Riding Bus ${seg.routeShortName}",
