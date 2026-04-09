@@ -1,324 +1,611 @@
 package com.example.plovdivtransit
 
-// Data model representing a popular place for navigation and transit
 data class PopularPlace(
     val name: String,
     val lat: Double,
     val lon: Double,
+    val category: String,
     val keywords: List<String>
 )
 
-// Singleton providing the data source for popular Plovdiv locations
 object PopularPlaces {
-    val items: List<PopularPlace> = listOf(
-        // Mandatory Places
+    val items = listOf(
+        // --- TRANSPORT ---
         PopularPlace(
-            name = "Rowing Canal / Гребна база",
-            lat = 42.1444,
-            lon = 24.7094,
-            keywords = listOf("Гребна база", "Grebna baza", "Rowing canal", "Regatta venue", "Гребной канал", "парк", "спорт")
+            "Централна железопътна гара Пловдив",
+            42.1333,
+            24.7405,
+            "Transport",
+            listOf("Централна гара", "Central Railway Station", "Gara", "Train", "влак", "Вокзал")
         ),
         PopularPlace(
-            name = "Mall Plovdiv",
-            lat = 42.1415,
-            lon = 24.7214,
-            keywords = listOf("Mall Plovdiv", "Мол Пловдив", "Молл Пловдив", "шопинг", "shopping", "кино", "cinema")
+            "Автогара Юг",
+            42.1335,
+            24.7431,
+            "Transport",
+            listOf("South Bus Station", "Avtogara Yug", "bus", "автобус", "гара юг")
         ),
         PopularPlace(
-            name = "Plovdiv Plaza",
-            lat = 42.1408,
-            lon = 24.7836,
-            keywords = listOf("Plovdiv Plaza", "Пловдив Плаза", "Плаза", "Галерия", "Galeria", "молл", "mall", "shopping")
+            "Автогара Родопи",
+            42.1308,
+            24.7419,
+            "Transport",
+            listOf("Rodopi Bus Station", "автобус", "bus", "гара родопи")
         ),
         PopularPlace(
-            name = "Markovo Tepe Mall",
-            lat = 42.1412,
-            lon = 24.7423,
-            keywords = listOf("Markovo Tepe", "Марково тепе", "Марково тепе молл", "мол", "mall")
+            "Автогара Север",
+            42.1643,
+            24.7397,
+            "Transport",
+            listOf("Sever Bus Station", "автобус", "bus", "гара север", "Филипово")
         ),
         PopularPlace(
-            name = "Central Square / Център",
-            lat = 42.1420,
-            lon = 24.7500,
-            keywords = listOf("Център", "Center", "Central square", "Центр", "Площад Централен", "Главна", "Glavnata", "Downtown")
+            "Железопътна гара Филипово",
+            42.1691,
+            24.7410,
+            "Transport",
+            listOf("Gara Filipovo", "Filipovo Station", "влак", "train")
         ),
         PopularPlace(
-            name = "Old Town / Старият град",
-            lat = 42.1484,
-            lon = 24.7516,
-            keywords = listOf("Старият град", "Стария град", "Old Town", "Старый город", "Архитектурен резерват", "история")
+            "Железопътна гара Тракия",
+            42.1264,
+            24.7869,
+            "Transport",
+            listOf("Gara Trakia", "Trakia Station", "влак", "train")
         ),
         PopularPlace(
-            name = "Kapana / Капана",
-            lat = 42.1495,
-            lon = 24.7483,
-            keywords = listOf("Капана", "Kapana", "Creative district", "барове", "bars", "ресторанти", "кафе")
-        ),
-        PopularPlace(
-            name = "International Fair / Панаир",
-            lat = 42.1565,
-            lon = 24.7489,
-            keywords = listOf("Панаир", "Fair", "International Fair Plovdiv", "Международен панаир", "Выставка", "Пловдивски панаир")
-        ),
-        PopularPlace(
-            name = "Bunardzhika / Alyosha",
-            lat = 42.1430,
-            lon = 24.7360,
-            keywords = listOf("Bunardzhika", "Бунарджика", "Alyosha", "Альоша", "Алеша", "хълм", "hill", "парк", "паметник")
-        ),
-        PopularPlace(
-            name = "Youth Hill / Младежки хълм",
-            lat = 42.1339,
-            lon = 24.7291,
-            keywords = listOf("Youth Hill", "Младежки хълм", "Джендем тепе", "Молодежный холм", "Детска железница", "парк")
-        ),
-        PopularPlace(
-            name = "Hotel Maritsa",
-            lat = 42.1528,
-            lon = 24.7461,
-            keywords = listOf("Maritsa", "Хотел Марица", "hotel Maritsa area", "Марица", "река", "river", "отель")
-        ),
-        PopularPlace(
-            name = "South Bus Station / Автогара Юг",
-            lat = 42.1335,
-            lon = 24.7431,
-            keywords = listOf("South bus station", "Автогара Юг", "Avtogara Yug", "Автовокзал Юг", "автобус", "bus")
-        ),
-        PopularPlace(
-            name = "Rodopi Bus Station / Автогара Родопи",
-            lat = 42.1308,
-            lon = 24.7419,
-            keywords = listOf("Rodopi bus station area", "Автогара Родопи", "Avtogara Rodopi", "Автовокзал Родопи", "автобус", "bus")
-        ),
-        PopularPlace(
-            name = "Central Railway Station / Централна гара",
-            lat = 42.1333,
-            lon = 24.7405,
-            keywords = listOf("Central Railway Station", "Централна гара", "Гара Пловдив", "Центральный вокзал", "влак", "train")
-        ),
-        PopularPlace(
-            name = "Trimontium / Тримонциум",
-            lat = 42.1414,
-            lon = 24.7495,
-            keywords = listOf("Trimontium", "Тримонциум", "Ramada", "Рамада", "Princess", "хотел", "отель", "hotel")
-        ),
-        PopularPlace(
-            name = "Grand Hotel Plovdiv",
-            lat = 42.1555,
-            lon = 24.7441,
-            keywords = listOf("Grand Hotel Plovdiv", "Гранд Хотел Пловдив", "Новотел", "Novotel", "хотел", "отель")
-        ),
-        PopularPlace(
-            name = "SPS Hotel & Hall",
-            lat = 42.1411,
-            lon = 24.7820,
-            keywords = listOf("SPS", "СПС", "SPS hall", "хотел СПС", "отель СПС", "ЖК Тракия")
-        ),
-        PopularPlace(
-            name = "Hristo Botev Stadium / Стадион Христо Ботев",
-            lat = 42.1422,
-            lon = 24.7675,
-            keywords = listOf("Hristo Botev Stadium", "Стадион Христо Ботев", "Колежа", "Kolezha", "Ботев Пловдив", "стадион", "футбол")
-        ),
-        PopularPlace(
-            name = "Kolodruma / Колодрума",
-            lat = 42.1331,
-            lon = 24.7602,
-            keywords = listOf("Kolodruma", "Колодрума", "Многофункционална спортна зала", "Велотрек", "зала", "концерт")
-        ),
-        PopularPlace(
-            name = "University of Plovdiv / Пловдивски университет",
-            lat = 42.1384,
-            lon = 24.7485,
-            keywords = listOf("University of Plovdiv", "Пловдивски университет", "ПУ", "Ректорат", "Университет", "студенти")
-        ),
-        PopularPlace(
-            name = "Medical University / Медицински университет",
-            lat = 42.1365,
-            lon = 24.7335,
-            keywords = listOf("Medical University Plovdiv", "Медицински университет", "ВМИ", "МУ Пловдив", "Медицинский университет", "Мед")
-        ),
-        PopularPlace(
-            name = "PUMBAS / ПУ Нова сграда",
-            lat = 42.1634,
-            lon = 24.7259,
-            keywords = listOf("PUMBAS", "ПУ", "Нова сграда ПУ", "Паисий Хилендарски", "Спортна зала ПУ")
+            "Летище Пловдив",
+            42.0677,
+            24.8510,
+            "Transport",
+            listOf("Plovdiv Airport", "Крумово", "Krumovo", "летище")
         ),
 
-        // Malls, Hospitals, Major Transport & Landmarks
+        // --- SHOPPING ---
         PopularPlace(
-            name = "UMBAL St. George / УМБАЛ Свети Георги",
-            lat = 42.1427,
-            lon = 24.7176,
-            keywords = listOf("UMBAL St. George", "УМБАЛ Свети Георги", "Хирургиите", "Пещерско шосе", "Hospital", "Болница", "Больница")
+            "Mall Plovdiv",
+            42.1415,
+            24.7214,
+            "Shopping",
+            listOf("Мол Пловдив", "Mall", "West", "шопинг")
         ),
         PopularPlace(
-            name = "UMBAL Plovdiv / УМБАЛ Пловдив (Окръжна)",
-            lat = 42.1584,
-            lon = 24.7340,
-            keywords = listOf("UMBAL Plovdiv", "УМБАЛ Пловдив", "Окръжна болница", "Okrazhna bolnitsa", "Hospital", "Больница")
+            "Plovdiv Plaza",
+            42.1408,
+            24.7836,
+            "Shopping",
+            listOf("Пловдив Плаза", "Plaza Mall", "Тракия")
         ),
         PopularPlace(
-            name = "UMBAL Kaspela / УМБАЛ Каспела",
-            lat = 42.1353,
-            lon = 24.7198,
-            keywords = listOf("Kaspela", "Каспела", "UMBAL Kaspela", "Hospital", "Болница", "Больница")
+            "Mall Markovo Tepe",
+            42.1412,
+            24.7423,
+            "Shopping",
+            listOf("Марково тепе", "Markovo Tepe", "мол", "център")
         ),
         PopularPlace(
-            name = "Pulmed Hospital / УМБАЛ Пълмед",
-            lat = 42.1417,
-            lon = 24.7185,
-            keywords = listOf("Pulmed", "Пълмед", "Hospital", "Болница", "Поликлиника", "Больница")
+            "Гранд Търговски Център",
+            42.1401,
+            24.7533,
+            "Shopping",
+            listOf("Гранд", "Grand Shopping Center", "Капитан Райчо")
         ),
         PopularPlace(
-            name = "Sever Bus Station / Автогара Север",
-            lat = 42.1643,
-            lon = 24.7397,
-            keywords = listOf("Sever Bus Station", "Автогара Север", "Avtogara Sever", "Автовокзал Север", "Филипово")
+            "Форум Тракия",
+            42.1351,
+            24.7885,
+            "Shopping",
+            listOf("Forum Trakia", "център Тракия")
+        ),
+
+        PopularPlace(
+            "Супермаркет Лекси (Гигант)",
+            42.1565,
+            24.7365,
+            "Shopping",
+            listOf("Лекси Кършияка", "Lexi Karshiyaka", "Gigant", "Гигант", "Lexi", "supermarket")
         ),
         PopularPlace(
-            name = "Filipovo Railway Station / Гара Филипово",
-            lat = 42.1691,
-            lon = 24.7410,
-            keywords = listOf("Filipovo Station", "Гара Филипово", "ЖП гара", "Вокзал Филипово", "влак", "train")
+            "Супермаркет Лекси (Марица)",
+            42.1534,
+            24.7335,
+            "Shopping",
+            listOf("Лекси Марица", "Lexi Maritsa", "УХТ", "Lexi", "supermarket")
         ),
         PopularPlace(
-            name = "Trakia Railway Station / Гара Тракия",
-            lat = 42.1264,
-            lon = 24.7869,
-            keywords = listOf("Trakia Station", "Гара Тракия", "Вокзал Тракия", "влак", "train", "ЖК Тракия")
+            "Супермаркет Лекси (Тракия)",
+            42.1311,
+            24.7648,
+            "Shopping",
+            listOf(
+                "Лекси Тракия",
+                "Lexi Trakia",
+                "Retail Park",
+                "Ритейл парк",
+                "Lexi",
+                "supermarket"
+            )
+        ),
+
+        PopularPlace(
+            "Kaufland - Тракия",
+            42.1305,
+            24.7875,
+            "Shopping",
+            listOf("Кауфланд", "Kaufland Trakia")
         ),
         PopularPlace(
-            name = "Plovdiv Airport / Летище Пловдив",
-            lat = 42.0677,
-            lon = 24.8510,
-            keywords = listOf("Plovdiv Airport", "Летище Пловдив", "Аерогара", "Аэропорт", "Крумово", "Krumovo", "flights")
+            "Kaufland - Кючук Париж",
+            42.1188,
+            24.7435,
+            "Shopping",
+            listOf("Кауфланд Южен", "Kaufland Kyuchuk")
         ),
         PopularPlace(
-            name = "Roman Stadium / Римски стадион",
-            lat = 42.1478,
-            lon = 24.7480,
-            keywords = listOf("Roman Stadium", "Римски стадион", "Джумаята", "Римский стадион", "Античен стадион", "център")
+            "Kaufland - Кършияка",
+            42.1555,
+            24.7335,
+            "Shopping",
+            listOf("Кауфланд", "Kaufland Karshiyaka")
         ),
         PopularPlace(
-            name = "Dzhumaya Mosque / Джумая джамия",
-            lat = 42.1478,
-            lon = 24.7481,
-            keywords = listOf("Dzhumaya", "Джумая джамия", "Мечеть", "Mosque", "център")
+            "Kaufland - Брезовско шосе",
+            42.1645,
+            24.7455,
+            "Shopping",
+            listOf("Кауфланд Център", "Kaufland Brezovsko")
         ),
         PopularPlace(
-            name = "Stochna Gara Intersection / Сточна гара",
-            lat = 42.1378,
-            lon = 24.7523,
-            keywords = listOf("Stochna Gara", "Сточна гара", "Кръстовище", "Intersection", "трафик")
+            "Kaufland - Смирненски",
+            42.1265,
+            24.7115,
+            "Shopping",
+            listOf("Кауфланд Смирненски", "Kaufland Smirnenski")
+        ),
+
+        PopularPlace("Lidl - Тракия", 42.1325, 24.7845, "Shopping", listOf("Лидл", "Lidl")),
+        PopularPlace("Lidl - Кършияка", 42.1615, 24.7415, "Shopping", listOf("Лидл", "Lidl")),
+        PopularPlace("Lidl - Център", 42.1408, 24.7578, "Shopping", listOf("Лидл", "Lidl")),
+        PopularPlace("Lidl - Смирненски", 42.1345, 24.7155, "Shopping", listOf("Лидл", "Lidl")),
+        PopularPlace("Lidl - Южен", 42.1155, 24.7485, "Shopping", listOf("Лидл", "Lidl")),
+
+        PopularPlace("Metro 1 (Тракия)", 42.1385, 24.7995, "Shopping", listOf("Метро", "Metro")),
+        PopularPlace("Metro 2 (Марица)", 42.1525, 24.7115, "Shopping", listOf("Метро", "Metro")),
+        PopularPlace(
+            "Technopolis Тракия",
+            42.1395,
+            24.7975,
+            "Shopping",
+            listOf("Технополис", "Technopolis")
+        ),
+        PopularPlace("Praktiker", 42.1535, 24.7135, "Shopping", listOf("Практикер", "Praktiker")),
+        PopularPlace(
+            "Mr. Bricolage",
+            42.1315,
+            24.7715,
+            "Shopping",
+            listOf("Бриколаж", "Bricolage")
+        ),
+
+        PopularPlace(
+            "Събота пазар",
+            42.1307,
+            24.7486,
+            "Shopping",
+            listOf("Saturday Market", "Южен", "пазар")
         ),
         PopularPlace(
-            name = "Chifte Banya / Чифте баня",
-            lat = 42.1517,
-            lon = 24.7488,
-            keywords = listOf("Chifte Banya", "Чифте баня", "Баня Старинна", "Кръстовище Шести Септември")
+            "Понеделник пазар",
+            42.1455,
+            24.7555,
+            "Shopping",
+            listOf("Monday Market", "пазар")
         ),
         PopularPlace(
-            name = "Plovdiv Municipality / Община Пловдив",
-            lat = 42.1432,
-            lon = 24.7496,
-            keywords = listOf("Municipality", "Община Пловдив", "Кметство", "Мэрия", "Копчетата")
+            "Четвъртък пазар",
+            42.1485,
+            24.7435,
+            "Shopping",
+            listOf("Thursday Market", "пазар")
+        ),
+
+        // --- EDUCATION ---
+        PopularPlace(
+            "Пловдивски университет „Паисий Хилендарски“ - Ректорат",
+            42.1384,
+            24.7485,
+            "Education",
+            listOf("ПУ", "Пловдивски университет", "Plovdiv University", "университет")
         ),
         PopularPlace(
-            name = "Agricultural University / Аграрен университет",
-            lat = 42.1396,
-            lon = 24.7661,
-            keywords = listOf("Agricultural University", "Аграрен университет", "ВСИ", "Аграрный университет")
+            "Пловдивски университет „Паисий Хилендарски“ - Нова сграда",
+            42.1634,
+            24.7259,
+            "Education",
+            listOf("ПУ Нова сграда", "PUMBAS", "университет")
         ),
         PopularPlace(
-            name = "University of Food Technologies / УХТ",
-            lat = 42.1524,
-            lon = 24.7351,
-            keywords = listOf("UFT", "УХТ", "ВИХВП", "Университет по хранителни технологии", "Пищевой университет")
+            "Медицински университет - Пловдив",
+            42.1365,
+            24.7335,
+            "Education",
+            listOf("МУ", "Медицински университет", "ВМИ", "Medical University", "университет")
         ),
         PopularPlace(
-            name = "Kamenitza Park",
-            lat = 42.1418,
-            lon = 24.7615,
-            keywords = listOf("Kamenitza", "Каменица", "Каменица парк", "Бирена фабрика", "комплекс")
+            "Технически университет - Филиал Пловдив",
+            42.1368,
+            24.7505,
+            "Education",
+            listOf("ТУ", "Технически университет", "Technical University", "университет")
         ),
         PopularPlace(
-            name = "Lauta Park / Парк Лаута",
-            lat = 42.1360,
-            lon = 24.7758,
-            keywords = listOf("Lauta", "Лаута", "Парк Лаута", "Тракия", "отдих", "природа")
+            "Аграрен университет - Пловдив",
+            42.1396,
+            24.7661,
+            "Education",
+            listOf("АУ", "Аграрен университет", "ВСИ", "Agricultural University", "университет")
         ),
         PopularPlace(
-            name = "Lokomotiv Stadium / Стадион Локомотив",
-            lat = 42.1350,
-            lon = 24.7711,
-            keywords = listOf("Lokomotiv Stadium", "Стадион Локомотив", "Лаута", "Локо Пловдив", "стадион", "футбол")
+            "Университет по хранителни технологии",
+            42.1524,
+            24.7351,
+            "Education",
+            listOf("УХТ", "ВИХВП", "Food Tech University", "университет")
         ),
         PopularPlace(
-            name = "Botev Training Complex / База Коматево",
-            lat = 42.1011,
-            lon = 24.7081,
-            keywords = listOf("Botev Complex", "Футболен комплекс Ботев", "Коматево", "база", "футбол")
+            "АМТИИ „Проф. Асен Диамандиев“",
+            42.1475,
+            24.7525,
+            "Education",
+            listOf("АМТИИ", "Музикална академия", "университет")
+        ),
+
+        PopularPlace(
+            "МГ „Академик Кирил Попов“",
+            42.1325,
+            24.7265,
+            "Education",
+            listOf("Математическа гимназия", "МГ", "MG Plovdiv", "училище")
         ),
         PopularPlace(
-            name = "Trakia Economic Zone / ТИЗ",
-            lat = 42.1866,
-            lon = 24.6469,
-            keywords = listOf("Trakia Economic Zone", "ТИЗ", "Индустриална зона", "Радиново", "Марица", "Industrial")
+            "ЕГ „Пловдив“",
+            42.1665,
+            24.7295,
+            "Education",
+            listOf("Английската гимназия", "English High School", "АГ", "училище")
         ),
         PopularPlace(
-            name = "KCM Plovdiv / КЦМ",
-            lat = 42.0835,
-            lon = 24.8093,
-            keywords = listOf("KCM", "КЦМ Пловдив", "Завод", "Асеновградско шосе", "промишленост")
+            "ЕГ „Иван Вазов“",
+            42.1655,
+            24.7285,
+            "Education",
+            listOf("Руската гимназия", "Russian High School", "училище")
         ),
         PopularPlace(
-            name = "Customs Plovdiv / Митница Пловдив",
-            lat = 42.1091,
-            lon = 24.7578,
-            keywords = listOf("Customs", "Митница Пловдив", "Кукленско шосе", "Таможня", "Mitnitsa")
+            "Национална търговска гимназия",
+            42.1415,
+            24.7405,
+            "Education",
+            listOf("Търговската", "НТГ", "Commercial High School", "училище")
         ),
         PopularPlace(
-            name = "Saturday Market / Събота пазар",
-            lat = 42.1307,
-            lon = 24.7486,
-            keywords = listOf("Saturday Market", "Събота пазар", "Кючук Париж", "Рынок", "пазар")
+            "ФЕГ „Антоан дьо Сент-Екзюпери“",
+            42.1615,
+            24.7815,
+            "Education",
+            listOf("Френската гимназия", "French High School", "училище")
         ),
         PopularPlace(
-            name = "Trakia Forum / Форум Тракия",
-            lat = 42.1351,
-            lon = 24.7885,
-            keywords = listOf("Trakia Forum", "Форум Тракия", "Център Тракия", "ЖК Тракия", "паметник")
+            "ХГ „Св. св. Кирил и Методий“",
+            42.1485,
+            24.7435,
+            "Education",
+            listOf("Хуманитарната гимназия", "ХГ", "училище")
         ),
         PopularPlace(
-            name = "Kyuchuk Paris Center / Кючук Париж (Бели Брези)",
-            lat = 42.1265,
-            lon = 24.7443,
-            keywords = listOf("Kyuchuk Paris", "Кючук Париж", "Бели Брези", "Македония", "Въстанически")
+            "ПГЕЕ - Пловдив",
+            42.1335,
+            24.7245,
+            "Education",
+            listOf("Електротехникум", "Електрото", "ПГЕЕ", "училище")
         ),
         PopularPlace(
-            name = "Karshiyaka / Кършияка (Гранд Хотел)",
-            lat = 42.1561,
-            lon = 24.7411,
-            keywords = listOf("Karshiyaka", "Кършияка", "Северен", "Лекси", "Lexi", "Северный район")
+            "ПГМТ „Проф. Цветан Лазаров“",
+            42.1325,
+            24.7345,
+            "Education",
+            listOf("Механотехникум", "Механото", "училище")
         ),
         PopularPlace(
-            name = "Proslav / Прослав",
-            lat = 42.1373,
-            lon = 24.6853,
-            keywords = listOf("Proslav", "Прослав", "квартал", "neighborhood", "район")
+            "СУ „Свети Патриарх Евтимий“",
+            42.1410,
+            24.7490,
+            "Education",
+            listOf("Лиляната", "училище")
+        ),
+
+        // --- HEALTH ---
+        PopularPlace(
+            "УМБАЛ „Свети Георги“ - Хирургичен блок",
+            42.1345,
+            24.7170,
+            "Health",
+            listOf("Хирургиите", "болница", "hospital", "St. George", "Пещерско шосе")
         ),
         PopularPlace(
-            name = "Komatevo / Коматево",
-            lat = 42.1037,
-            lon = 24.7143,
-            keywords = listOf("Komatevo", "Коматево", "Коматевско шосе", "квартал", "район")
+            "УМБАЛ „Свети Георги“ - База 1",
+            42.1405,
+            24.7315,
+            "Health",
+            listOf("Свети Георги", "Васил Априлов", "болница", "hospital")
         ),
         PopularPlace(
-            name = "Billa 6th September / Billa 6-ти Септември",
-            lat = 42.1497,
-            lon = 24.7570,
-            keywords = listOf("Billa", "Била", "супермаркет", "supermarket", "6-ти Септември", "Шести септември")
+            "УМБАЛ Пловдив",
+            42.1584,
+            24.7340,
+            "Health",
+            listOf("Окръжна болница", "hospital", "болница", "Окръжна")
+        ),
+        PopularPlace(
+            "УМБАЛ „Пълмед“",
+            42.1417,
+            24.7185,
+            "Health",
+            listOf("Пълмед", "Pulmed", "болница", "hospital")
+        ),
+        PopularPlace(
+            "УМБАЛ „Каспела“",
+            42.1353,
+            24.7198,
+            "Health",
+            listOf("Каспела", "Kaspela", "болница", "hospital")
+        ),
+        PopularPlace(
+            "МБАЛ „Свети Пантелеймон“",
+            42.1215,
+            24.7445,
+            "Health",
+            listOf("Втора градска болница", "болница", "hospital", "Южен")
+        ),
+        PopularPlace(
+            "МБАЛ „Свети Мина“",
+            42.1365,
+            24.7465,
+            "Health",
+            listOf("Първа градска болница", "болница", "hospital", "Сточна гара")
+        ),
+        PopularPlace(
+            "МБАЛ „Еврохоспитал“",
+            42.1155,
+            24.7435,
+            "Health",
+            listOf("Еврохоспитал", "Eurohospital", "болница", "hospital")
+        ),
+        PopularPlace(
+            "СБАЛАГ „Селена“",
+            42.1425,
+            24.7045,
+            "Health",
+            listOf("Селена", "Selena", "АГ болница", "hospital")
+        ),
+        PopularPlace(
+            "МБАЛ „Медлайн“",
+            42.1415,
+            24.7565,
+            "Health",
+            listOf("Медлайн", "Medline", "болница", "hospital")
+        ),
+
+        // --- LANDMARKS ---
+        PopularPlace(
+            "Гребна база Пловдив",
+            42.1472,
+            24.7125,
+            "Landmark",
+            listOf("Rowing Canal", "Гребната", "Grebna baza", "парк")
+        ),
+        PopularPlace(
+            "Античен театър Пловдив",
+            42.1469,
+            24.7510,
+            "Landmark",
+            listOf("Ancient Theatre", "Стария град")
+        ),
+        PopularPlace(
+            "Римски стадион",
+            42.1478,
+            24.7480,
+            "Landmark",
+            listOf("Roman Stadium", "Джумаята", "център")
+        ),
+        PopularPlace(
+            "Паметник на Альоша",
+            42.1437,
+            24.7385,
+            "Landmark",
+            listOf("Альоша", "Alyosha", "Бунарджика")
+        ),
+        PopularPlace(
+            "Младежки хълм",
+            42.1339,
+            24.7291,
+            "Landmark",
+            listOf("Youth Hill", "Джендем тепе", "парк")
+        ),
+        PopularPlace(
+            "Старият град",
+            42.1484,
+            24.7516,
+            "Landmark",
+            listOf("Old Town", "Трихълмието")
+        ),
+        PopularPlace(
+            "Капана",
+            42.1495,
+            24.7483,
+            "Landmark",
+            listOf("Kapana", "creative district", "център")
+        ),
+        PopularPlace(
+            "Международен панаир Пловдив",
+            42.1565,
+            24.7489,
+            "Landmark",
+            listOf("Панаира", "International Fair", "Fair")
+        ),
+        PopularPlace(
+            "Небет тепе",
+            42.1505,
+            24.7525,
+            "Landmark",
+            listOf("Nebet Tepe", "Стария град")
+        ),
+        PopularPlace(
+            "Сахат тепе",
+            42.1455,
+            24.7455,
+            "Landmark",
+            listOf("Sahat Tepe", "Данов хълм", "Часовникова кула")
+        ),
+        PopularPlace(
+            "Пеещи фонтани",
+            42.1415,
+            24.7455,
+            "Landmark",
+            listOf("Singing Fountains", "Цар Симеонова градина")
+        ),
+
+        // --- SPORT & CULTURE ---
+        PopularPlace(
+            "Многофункционална спортна зала „Колодрума“",
+            42.1331,
+            24.7602,
+            "Sport",
+            listOf("Колодрума", "Kolodruma Arena", "зала")
+        ),
+        PopularPlace(
+            "Стадион „Христо Ботев“",
+            42.1422,
+            24.7675,
+            "Sport",
+            listOf("Ботев", "Колежа", "стадион")
+        ),
+        PopularPlace(
+            "Стадион „Локомотив“",
+            42.1350,
+            24.7711,
+            "Sport",
+            listOf("Локомотив", "Лаута", "стадион")
+        ),
+        PopularPlace(
+            "Стадион „Пловдив“",
+            42.1485,
+            24.7205,
+            "Sport",
+            listOf("Стадион Пловдив", "Големия стадион")
+        ),
+        PopularPlace(
+            "Спортен комплекс „Сила“",
+            42.1415,
+            24.7375,
+            "Sport",
+            listOf("Сила", "Sila", "комплекс")
+        ),
+        PopularPlace(
+            "Дом на културата „Борис Христов“",
+            42.1415,
+            24.7455,
+            "Culture",
+            listOf("Борис Христов", "Синдикален дом")
+        ),
+        PopularPlace(
+            "Народна библиотека „Иван Вазов“",
+            42.1395,
+            24.7485,
+            "Culture",
+            listOf("Библиотека", "Иван Вазов", "Library")
+        ),
+
+        // --- ADMIN ---
+        PopularPlace(
+            "Община Пловдив",
+            42.1432,
+            24.7496,
+            "Admin",
+            listOf("Общината", "Кметство", "Копчетата")
+        ),
+        PopularPlace(
+            "Централна поща Пловдив",
+            42.1425,
+            24.7505,
+            "Admin",
+            listOf("Пощата", "Post Office")
+        ),
+        PopularPlace("НАП Пловдив", 42.1285, 24.7445, "Admin", listOf("НАП", "Данъчното", "NAP")),
+        PopularPlace("КАТ Пловдив", 42.1725, 24.7525, "Admin", listOf("КАТ", "Регистрация")),
+        PopularPlace("Първо РПУ", 42.1285, 24.7485, "Admin", listOf("Полиция", "Police")),
+        PopularPlace("Второ РПУ", 42.1435, 24.7325, "Admin", listOf("Полиция", "Police")),
+        PopularPlace("Четвърто РПУ", 42.1455, 24.7585, "Admin", listOf("Полиция", "Police")),
+
+        // --- DISTRICTS ---
+        PopularPlace(
+            "Площад Централен",
+            42.1420,
+            24.7500,
+            "District",
+            listOf("Център", "Center", "Площад")
+        ),
+        PopularPlace(
+            "Сточна гара",
+            42.1378,
+            24.7523,
+            "District",
+            listOf("Stochna Gara", "кръстовище")
+        ),
+        PopularPlace(
+            "Район Южен (Кючук Париж)",
+            42.1265,
+            24.7443,
+            "District",
+            listOf("Кючук Париж", "Южен", "Kyuchuk")
+        ),
+        PopularPlace("Район Тракия", 42.1351, 24.7885, "District", listOf("Тракия", "Trakia")),
+        PopularPlace(
+            "Район Западен (Христо Смирненски)",
+            42.1375,
+            24.7125,
+            "District",
+            listOf("Смирненски", "Smirnenski", "Западен")
+        ),
+        PopularPlace(
+            "Район Северен (Кършияка)",
+            42.1565,
+            24.7415,
+            "District",
+            listOf("Кършияка", "Karshiyaka", "Северен")
+        ),
+        PopularPlace("Район Изгрев", 42.1515, 24.7855, "District", listOf("Изгрев", "Izgrev")),
+        PopularPlace(
+            "Квартал Каменица",
+            42.1415,
+            24.7615,
+            "District",
+            listOf("Каменица", "Kamenitza")
+        ),
+        PopularPlace("Квартал Прослав", 42.1373, 24.6853, "District", listOf("Прослав", "Proslav")),
+        PopularPlace(
+            "Квартал Коматево",
+            42.1037,
+            24.7143,
+            "District",
+            listOf("Коматево", "Komatevo")
+        ),
+        PopularPlace(
+            "Чифте баня",
+            42.1517,
+            24.7488,
+            "District",
+            listOf("Chifte Banya", "Баня Старинна")
         )
     )
 }

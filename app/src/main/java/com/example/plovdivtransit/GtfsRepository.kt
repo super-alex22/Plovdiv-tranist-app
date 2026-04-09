@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import org.osmdroid.util.GeoPoint
 
 class GtfsRepository(private val context: Context) {
+    private var cachedStopToRoutes: Map<String, Set<String>>? = null
     private var cachedTripsById: Map<String, GtfsTrip>? = null
     private var cachedRoutesById: Map<String, GtfsRoute>? = null
     private var cachedStopTimesByTrip: Map<String, List<GtfsStopTime>>? = null
@@ -15,7 +16,23 @@ class GtfsRepository(private val context: Context) {
     private var cachedTrips: List<GtfsTrip>? = null
     private var cachedRoutes: List<GtfsRoute>? = null
     private var cachedShapes: Map<String, List<GeoPoint>>? = null
+    private fun getStopToRoutes(): Map<String, Set<String>> {
+        cachedStopToRoutes?.let { return it }
 
+        val stopTimes = loadStopTimes()
+        val tripsById = getTripsById()
+
+        val result = stopTimes
+            .groupBy { it.stopId }
+            .mapValues { (_, times) ->
+                times.mapNotNull { stopTime ->
+                    tripsById[stopTime.tripId]?.routeId
+                }.toSet()
+            }
+
+        cachedStopToRoutes = result
+        return result
+    }
     fun readStopTimesFile(): String {
         return context.assets.open("plovdiv/stop_times.txt")
             .bufferedReader()
@@ -324,6 +341,138 @@ class GtfsRepository(private val context: Context) {
 
         result.add(current.toString())
         return result
+    }
+    // Добавьте/замените эти методы в GtfsRepository.kt
+
+    private var cachedRouteToAllStops: Map<String, Set<String>>? = null
+
+    // Индекс: ВСЕ остановки, которые встречаются на маршруте (во всех направлениях и трипах)
+    private fun getRouteToAllStops(): Map<String, Set<String>> {
+        cachedRouteToAllStops?.let { return it }
+        val stopTimes = loadStopTimes()
+        val trips = getTripsById()
+
+        val result = stopTimes.groupBy { trips[it.tripId]?.routeId ?: "" }
+            .filterKeys { it.isNotEmpty() }
+            .mapValues { entry -> entry.value.map { it.stopId }.toSet() }
+
+        cachedRouteToAllStops = result
+        return result
+    }
+
+    /**
+     * Находит лучшие сегменты между двумя остановками.
+     * Если routeId задан, ищет только внутри этого маршрута.
+     */
+    fun findSegments(startStopId: String, endStopId: String, routeId: String? = null): List<RouteSegment> {
+        val tripsById = getTripsById()
+        val routesById = getRoutesById()
+        val stopTimesByTrip = getStopTimesByTrip()
+        val results = mutableListOf<RouteSegment>()
+
+        for ((tripId, sortedStopTimes) in stopTimesByTrip) {
+            val trip = tripsById[tripId] ?: continue
+
+            // Фильтр по конкретному маршруту (важно для пересадок)
+            if (routeId != null && trip.routeId != routeId) continue
+
+            val start = sortedStopTimes.find { it.stopId == startStopId } ?: continue
+            val end = sortedStopTimes.find { it.stopId == endStopId } ?: continue
+
+            // Валидация порядка остановок
+            if (start.stopSequence < end.stopSequence) {
+                val route = routesById[trip.routeId] ?: continue
+                val sStop = findStopById(startStopId) ?: continue
+                val eStop = findStopById(endStopId) ?: continue
+
+                results.add(RouteSegment(
+                    routeId = trip.routeId,
+                    routeShortName = route.routeShortName,
+                    tripId = tripId,
+                    fromStop = sStop,
+                    toStop = eStop,
+                    departureTime = start.departureTime,
+                    arrivalTime = end.arrivalTime,
+                    stopCount = end.stopSequence - start.stopSequence,
+                    shapeId = trip.shapeId
+                ))
+            }
+        }
+
+        // Группируем по маршруту и берем самый быстрый вариант (минимальное время в пути)
+        return results.groupBy { it.routeId }
+            .map { group -> group.value.minBy { minutesBetweenTimes(it.departureTime, it.arrivalTime) } }
+    }
+
+    /**
+     * Основной алгоритм поиска (Прямые + 1 Пересадка)
+     */
+    suspend fun findComplexRouteOptions(
+        startLat: Double, startLon: Double,
+        destLat: Double, destLon: Double
+    ): List<RouteOption> = withContext(Dispatchers.IO) {
+        val allStops = loadStops()
+        val stopToRoutes = getStopToRoutes()
+        val routeToAllStops = getRouteToAllStops()
+
+        val sStops = allStops.map { it to distanceMeters(startLat, startLon, it.stopLat, it.stopLon) }
+            .sortedBy { it.second }.take(4)
+        val eStops = allStops.map { it to distanceMeters(destLat, destLon, it.stopLat, it.stopLon) }
+            .sortedBy { it.second }.take(4)
+
+        val options = mutableListOf<RouteOption>()
+
+        for ((sStop, sDist) in sStops) {
+            for ((eStop, eDist) in eStops) {
+                // 1. Прямые
+                findSegments(sStop.stopId, eStop.stopId).forEach {
+                    options.add(createOption(listOf(it), sDist, eDist))
+                }
+
+                // 2. Пересадки
+                val rStart = stopToRoutes[sStop.stopId] ?: emptySet()
+                val rEnd = stopToRoutes[eStop.stopId] ?: emptySet()
+
+                for (r1 in rStart) {
+                    val stopsOnR1 = routeToAllStops[r1] ?: emptySet()
+                    for (r2 in rEnd) {
+                        if (r1 == r2) continue
+
+                        val stopsOnR2 = routeToAllStops[r2] ?: emptySet()
+                        val commonStops = stopsOnR1.intersect(stopsOnR2)
+
+                        for (tStopId in commonStops) {
+                            if (tStopId == sStop.stopId || tStopId == eStop.stopId) continue
+
+                            // Строго привязываем первый сегмент к r1, второй к r2
+                            val seg1 = findSegments(sStop.stopId, tStopId, r1).firstOrNull()
+                            val seg2 = findSegments(tStopId, eStop.stopId, r2).firstOrNull()
+
+                            if (seg1 != null && seg2 != null) {
+                                options.add(createOption(listOf(seg1, seg2), sDist, eDist))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        options.distinctBy { it.uniqueKey }
+            .sortedWith(compareBy<RouteOption> { !it.isDirect }
+                .thenBy { it.totalMinutes }
+                .thenBy { it.segments.sumOf { s -> s.stopCount } })
+            .take(6)
+    }
+
+    private fun createOption(segments: List<RouteSegment>, sDist: Double, eDist: Double): RouteOption {
+        val walkTo = (sDist / 80.0).toInt().coerceAtLeast(1)
+        val walkFrom = (eDist / 80.0).toInt().coerceAtLeast(1)
+        val transitTime = segments.sumOf { minutesBetweenTimes(it.departureTime, it.arrivalTime).coerceAtLeast(2) }
+
+        // Штраф за пересадку (12 минут), чтобы прямые маршруты были в приоритете
+        val transferPenalty = (segments.size - 1) * 12
+
+        return RouteOption(segments, walkTo, walkFrom, walkTo + transitTime + walkFrom + transferPenalty)
     }
 
     private fun csvHeaderMap(headerLine: String): Map<String, Int> {

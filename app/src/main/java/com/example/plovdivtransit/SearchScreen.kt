@@ -158,82 +158,51 @@ fun SearchDestinationScreen(
     var isSearching by remember { mutableStateOf(false) }
 
     LaunchedEffect(query, userLat, userLon) {
-        android.util.Log.d("SEARCH_UI", "Query changed: $query")
-
         if (query.length < 3) {
             suggestions = emptyList()
             isSearching = false
             return@LaunchedEffect
         }
 
-        delay(500)
+        delay(400) // Debounce
         isSearching = true
 
         try {
-            android.util.Log.d("SEARCH_UI", "Starting search block")
             suggestions = withContext(Dispatchers.IO) {
-                android.util.Log.d("SEARCH_UI", "Inside withContext(IO)")
-                
-                val localPopular = try {
-                    PopularPlaces.items
-                        .filter {
-                            matchesSearch(it.name, query)    ||
-                                    it.keywords.any { keyword ->
-                                        matchesSearch(keyword, query)
-                                    }
-                        }
-                        .map {
-                            PlaceSearchResult(
-                                name = it.name,
-                                lat = it.lat,
-                                lon = it.lon
-                            )
-                        }.also {
-                            android.util.Log.d("SEARCH_UI", "localPopular count = ${it.size}")
-                        }
-                } catch (e: Exception) {
-                    android.util.Log.e("SEARCH_UI", "localPopular failed", e)
-                    emptyList<PlaceSearchResult>()
-                }
+                // 1. Local Curated Places
+                val localPopular = PopularPlaces.items
+                    .filter { place ->
+                        matchesSearch(place.name, query) ||
+                                place.keywords.any { matchesSearch(it, query) }
+                    }
+                    .map { PlaceSearchResult(it.name, it.lat, it.lon) }
 
-                val localStops = try {
-                    gtfsRepository.loadStops()
-                        .filter { matchesSearch(it.stopName, query) }
-                        .map {
-                            PlaceSearchResult(
-                                name = it.stopName,
-                                lat = it.stopLat,
-                                lon = it.stopLon
-                            )
-                        }.also {
-                            android.util.Log.d("SEARCH_UI", "localStops count = ${it.size}")
-                        }
-                } catch (e: Exception) {
-                    android.util.Log.e("SEARCH_UI", "localStops failed", e)
-                    emptyList<PlaceSearchResult>()
-                }
+                // 2. GTFS Stops
+                val localStops = gtfsRepository.loadStops()
+                    .filter { matchesSearch(it.stopName, query) }
+                    .map { PlaceSearchResult(it.stopName, it.stopLat, it.stopLon) }
 
-                // Temporary: Disable Geoapify completely
-                val remoteResults = emptyList<PlaceSearchResult>()
-                android.util.Log.d("SEARCH_UI", "remoteResults count = 0 (disabled)")
+                // 3. External API (Geoapify) - Only if we have few local results or to complement
+                val remoteResults = if (localPopular.size + localStops.size < 5) {
+                    geoapifyRepository.searchPlaces(query)
+                        .map { PlaceSearchResult(it.name, it.lat, it.lon) }
+                } else emptyList()
 
+                // Combine in order of priority: Popular -> Stops -> Remote
                 val combined = (localPopular + localStops + remoteResults)
-                    .distinctBy { normalizeSearchText(transliterateBgToLatin(it.name)) }
+                    .distinctBy {
+                        // Deduplicate by normalized name and roughly by coordinates (4 decimal places)
+                        val latInt = (it.lat * 1000).toInt()
+                        val lonInt = (it.lon * 1000).toInt()
+                        "${normalizeSearchText(it.name)}_$latInt$lonInt"
+                    }
 
-                android.util.Log.d("SEARCH_UI", "combined count = ${combined.size}")
-
-                val result = if (userLat != null && userLon != null) {
-                    combined.sortedBy { distanceMeters(userLat, userLon, it.lat, it.lon) }
-                } else {
-                    combined
-                }
-                android.util.Log.d("SEARCH_UI", "Final result size: ${result.size}")
-                result
+                // If user location is known, we could sort, but per requirements
+                // we maintain the Popular -> Stops -> Remote order.
+                combined.take(15)
             }
-            android.util.Log.d("SEARCH_UI", "Suggestions received: ${suggestions.size}")
         } catch (e: Exception) {
-            android.util.Log.e("SEARCH_UI", "Search outer block failed", e)
-            suggestions = emptyList()
+            android.util.Log.e("Search", "Search failed", e)
         } finally {
             isSearching = false
         }

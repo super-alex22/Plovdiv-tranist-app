@@ -69,15 +69,10 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
@@ -102,8 +97,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import org.osmdroid.views.overlay.Polyline
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
@@ -121,6 +114,7 @@ data class UserLocation(
     val lat: Double,
     val lon: Double
 )
+private val GRAND_HOTEL_PLOVDIV = UserLocation(42.1557, 24.7461)
 data class BusStop(
     val name: String,
     val lat: Double,
@@ -149,6 +143,36 @@ fun distanceBetween(
 fun walkingMinutes(distanceMeters: Double): Int {
     val metersPerMinute = 80.0
     return kotlin.math.ceil(distanceMeters / metersPerMinute).toInt().coerceAtLeast(1)
+}
+fun minutesBetweenTimes(startTime: String, endTime: String): Int {
+    fun parseToMinutes(value: String): Int {
+        val parts = value.split(":")
+        if (parts.size < 2) return 0
+
+        val hours = parts[0].toIntOrNull() ?: 0
+        val minutes = parts[1].toIntOrNull() ?: 0
+
+        return hours * 60 + minutes
+    }
+
+    val start = parseToMinutes(startTime)
+    val end = parseToMinutes(endTime)
+
+    val diff = end - start
+
+    return when {
+        diff <= 0 -> 2
+        else -> diff
+    }
+}
+fun formatDelayMinutes(delayMs: Long?): String {
+    if (delayMs == null) return "Live"
+    val min = kotlin.math.abs(delayMs) / 60000
+    return when {
+        delayMs > 0 -> "Delay ${min} min"
+        delayMs < 0 -> "Early ${min} min"
+        else -> "On time"
+    }
 }
 fun findNearestGtfsStops(
     lat: Double,
@@ -221,12 +245,20 @@ fun HomeMapScreen(
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
                     currentLocation = GeoPoint(location.latitude, location.longitude)
+
                     onUserLocationChanged(
                         UserLocation(
                             lat = location.latitude,
                             lon = location.longitude
                         )
                     )
+
+                    android.util.Log.d(
+                        "LOCATION_DEBUG",
+                        "Confirmed user location: ${location.latitude}, ${location.longitude}"
+                    )
+                } else {
+                    android.util.Log.d("LOCATION_DEBUG", "lastLocation is null")
                 }
             }
         }
@@ -287,6 +319,9 @@ class MainActivity : ComponentActivity() {
                     var userLocation by remember {
                         mutableStateOf<UserLocation?>(null)
                     }
+                    var activeRoute by remember {
+                        mutableStateOf<RouteOption?>(null)
+                    }
 
                     AppScaffold(
                         currentScreen = currentScreen,
@@ -295,6 +330,8 @@ class MainActivity : ComponentActivity() {
                         onPlaceSelected = { selectedPlace = it },
                         userLocation = userLocation,
                         onUserLocationChanged = { userLocation = it },
+                        activeRoute = activeRoute,
+                        onRouteSelected = { activeRoute = it },
                         onScreenSelected = { currentScreen = it },
                         onLogout = {
                             authManager.logout()
@@ -315,6 +352,8 @@ fun AppScaffold(
     onPlaceSelected: (PlaceSearchResult) -> Unit,
     userLocation: UserLocation?,
     onUserLocationChanged: (UserLocation) -> Unit,
+    activeRoute: RouteOption?,
+    onRouteSelected: (RouteOption) -> Unit,
     onScreenSelected: (AppScreen) -> Unit,
     onLogout: () -> Unit
 ) {
@@ -344,9 +383,13 @@ fun AppScaffold(
                     destination = selectedPlace,
                     userLocation = userLocation,
                     onBack = { onScreenSelected(AppScreen.Home) },
+                    onRouteSelected = { onRouteSelected(it) },
                     onGo = { onScreenSelected(AppScreen.Go) }
                 )
                 AppScreen.Go -> GoScreen(
+                    selectedRoute = activeRoute,
+                    destination = selectedPlace,
+                    userLocation = userLocation,
                     onBack = { onScreenSelected(AppScreen.Routes) }
                 )
                 AppScreen.Profile -> ProfileScreen(
@@ -815,15 +858,16 @@ fun RouteMapPreview(
     destination: PlaceSearchResult?,
     userLocation: UserLocation?,
     routeData: RouteData?,
-    selectedRoute: GtfsRouteOption? = null,
-    gtfsRepository: GtfsRepository? = null
-) {
+    selectedRoute: RouteOption? = null,
+    gtfsRepository: GtfsRepository? = null,
+    liveVehicles: List<LiveVehicle> = emptyList()
+){
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp) // Slightly taller for better visibility
+            .height(180.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             RouteMapScreen(
@@ -831,7 +875,8 @@ fun RouteMapPreview(
                 userLocation = userLocation,
                 routeData = routeData,
                 selectedRoute = selectedRoute,
-                gtfsRepository = gtfsRepository
+                gtfsRepository = gtfsRepository,
+                liveVehicles = liveVehicles
             )
         }
     }
@@ -843,8 +888,9 @@ fun RouteMapScreen(
     destination: PlaceSearchResult?,
     userLocation: UserLocation?,
     routeData: RouteData?,
-    selectedRoute: GtfsRouteOption? = null,
-    gtfsRepository: GtfsRepository? = null
+    selectedRoute: RouteOption? = null,
+    gtfsRepository: GtfsRepository? = null,
+    liveVehicles: List<LiveVehicle> = emptyList()
 ) {
     val context = LocalContext.current
 
@@ -877,58 +923,74 @@ fun RouteMapScreen(
         update = { mapView ->
             mapView.overlays.clear()
 
-            if (selectedRoute != null) {
-                android.util.Log.d("ROUTING", "Rendering selected route: Bus ${selectedRoute.routeShortName}")
-                val startStop = GeoPoint(selectedRoute.startStop.stopLat, selectedRoute.startStop.stopLon)
-                val endStop = GeoPoint(selectedRoute.endStop.stopLat, selectedRoute.endStop.stopLon)
+            val firstSegment = selectedRoute?.segments?.firstOrNull()
 
-                // 1. Walk to start stop
+            if (firstSegment != null) {
+                android.util.Log.d(
+                    "ROUTING",
+                    "Rendering selected route: Bus ${firstSegment.routeShortName}"
+                )
+
+                val startStop = GeoPoint(
+                    firstSegment.fromStop.stopLat,
+                    firstSegment.fromStop.stopLon
+                )
+                val endStop = GeoPoint(
+                    firstSegment.toStop.stopLat,
+                    firstSegment.toStop.stopLon
+                )
+
                 val walk1 = Polyline().apply {
                     setPoints(listOf(fromPoint, startStop))
                     outlinePaint.color = android.graphics.Color.GRAY
                     outlinePaint.strokeWidth = 4f
-                    outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                }
-                
-                // 2. Bus segment
-                val busPoints = if (gtfsRepository != null && selectedRoute.shapeId != null) {
-                    val points = gtfsRepository.getShapePoints(selectedRoute.shapeId, selectedRoute.startStop, selectedRoute.endStop)
-                    android.util.Log.d("ROUTING", "Found ${points.size} shape points for shapeId ${selectedRoute.shapeId}")
-                    points
-                } else {
-                    android.util.Log.d("ROUTING", "No shapeId or repository, using direct stop-to-stop line.")
-                    emptyList()
+                    outlinePaint.pathEffect =
+                        android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
+                val busPoints =
+                    if (gtfsRepository != null && firstSegment.shapeId != null) {
+                        val points = gtfsRepository.getShapePoints(
+                            firstSegment.shapeId,
+                            firstSegment.fromStop,
+                            firstSegment.toStop
+                        )
+                        android.util.Log.d(
+                            "ROUTING",
+                            "Found ${points.size} shape points for shapeId ${firstSegment.shapeId}"
+                        )
+                        points
+                    } else {
+                        android.util.Log.d(
+                            "ROUTING",
+                            "No shapeId or repository, using direct stop-to-stop line."
+                        )
+                        emptyList()
+                    }
+
                 val busLine = Polyline().apply {
-                    setPoints(
-                        if (busPoints.isNotEmpty()) busPoints
-                        else listOf(startStop, endStop)
-                    )
-                    outlinePaint.color = android.graphics.Color.parseColor("#3B82F6") // Blue
+                    setPoints(if (busPoints.isNotEmpty()) busPoints else listOf(startStop, endStop))
+                    outlinePaint.color = android.graphics.Color.parseColor("#3B82F6")
                     outlinePaint.strokeWidth = 10f
                 }
 
-                // 3. Walk to destination
                 val walk2 = Polyline().apply {
                     setPoints(listOf(endStop, toPoint))
                     outlinePaint.color = android.graphics.Color.GRAY
                     outlinePaint.strokeWidth = 4f
-                    outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    outlinePaint.pathEffect =
+                        android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
-                // Start stop marker
                 val startStopMarker = Marker(mapView).apply {
                     position = startStop
-                    title = "Pickup: ${selectedRoute.startStop.stopName}"
+                    title = "Pickup: ${firstSegment.fromStop.stopName}"
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    // You could set a custom bus icon here
                 }
 
-                // End stop marker
                 val endStopMarker = Marker(mapView).apply {
                     position = endStop
-                    title = "Dropoff: ${selectedRoute.endStop.stopName}"
+                    title = "Dropoff: ${firstSegment.toStop.stopName}"
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 }
 
@@ -938,8 +1000,10 @@ fun RouteMapScreen(
                 mapView.overlays.add(startStopMarker)
                 mapView.overlays.add(endStopMarker)
             } else {
-                android.util.Log.d("ROUTING", "No selected GTFS route. Not drawing any transit line.")
-                // No transit route selected -> No line between fromPoint and toPoint
+                android.util.Log.d(
+                    "ROUTING",
+                    "No selected GTFS route. Not drawing any transit line."
+                )
             }
 
             val fromMarker = Marker(mapView).apply {
@@ -956,6 +1020,24 @@ fun RouteMapScreen(
 
             mapView.overlays.add(fromMarker)
             mapView.overlays.add(toMarker)
+
+            liveVehicles.forEach { vehicle ->
+                android.util.Log.d(
+                    "LIVE_MAP",
+                    "Draw vehicle ${vehicle.line} at ${vehicle.lat}, ${vehicle.lon}"
+                )
+                val marker = Marker(mapView).apply {
+                    position = GeoPoint(vehicle.lat, vehicle.lon)
+                    title = buildString {
+                        append("Bus ${vehicle.line}")
+                        vehicle.destinationEn?.let { append(" → $it") }
+                        append("\n")
+                        append(formatDelayMinutes(vehicle.delayMs))
+                    }
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                }
+                mapView.overlays.add(marker)
+            }
 
             val centerPoint = GeoPoint(
                 (fromPoint.latitude + toPoint.latitude) / 2.0,
@@ -1109,22 +1191,25 @@ fun SuggestedRoutesScreen(
     destination: PlaceSearchResult?,
     userLocation: UserLocation?,
     onBack: () -> Unit = {},
+    onRouteSelected: (RouteOption) -> Unit,
     onGo: () -> Unit
-
 ) {
 
     val repository = remember { RoutingRepository() }
     val context = LocalContext.current
     val gtfsRepository = remember { GtfsRepository(context) }
-    var routeOptions by remember { mutableStateOf<List<GtfsRouteOption>>(emptyList()) }
+    var routeOptions by remember { mutableStateOf<List<RouteOption>>(emptyList()) }
     var selectedRouteIndex by remember { mutableStateOf(0) }
     var isLoadingRoutes by remember { mutableStateOf(false) }
     var routeData by remember { mutableStateOf<RouteData?>(null) }
+    val liveRepository = remember { LiveTransportRepository() }
+    var liveVehicles by remember { mutableStateOf<List<LiveVehicle>>(emptyList()) }
+    var showLocationDialog by remember { mutableStateOf(false) }
+    var usedTestLocation by remember { mutableStateOf<UserLocation?>(null) }
 
-    val fromPoint = if (userLocation != null) {
-        GeoPoint(userLocation.lat, userLocation.lon)
-    } else {
-        GeoPoint(42.1354, 24.7453)
+    val effectiveLocation = userLocation ?: usedTestLocation
+    val fromPoint = effectiveLocation?.let {
+        GeoPoint(it.lat, it.lon)
     }
 
     val toPoint = if (destination != null) {
@@ -1132,36 +1217,70 @@ fun SuggestedRoutesScreen(
     } else {
         GeoPoint(42.1419, 24.7316)
     }
+    DisposableEffect(Unit) {
+        liveRepository.connectPlovdiv(
+            onVehiclesUpdated = { vehicles ->
+                liveVehicles = vehicles
+                android.util.Log.d("LIVE_WS", "Vehicles received: ${vehicles.size}")
+            },
+            onError = { error ->
+                android.util.Log.e("LIVE_WS", "Socket error", error)
+            }
+        )
 
-    LaunchedEffect(destination, userLocation) {
-        if (destination == null || userLocation == null) {
+        onDispose {
+            liveRepository.disconnect()
+        }
+    }
+
+
+    LaunchedEffect(destination, effectiveLocation) {
+        val currentLocation = effectiveLocation
+
+        if (destination == null || currentLocation == null) {
             android.util.Log.d("ROUTING", "No destination or location, skipping search.")
             routeOptions = emptyList()
             return@LaunchedEffect
         }
 
         isLoadingRoutes = true
-        android.util.Log.d("ROUTING", "Searching for GTFS routes from (${userLocation.lat}, ${userLocation.lon}) to (${destination.lat}, ${destination.lon})")
+        android.util.Log.d(
+            "ROUTING",
+            "Searching for GTFS routes from (${currentLocation.lat}, ${currentLocation.lon}) to (${destination.lat}, ${destination.lon})"
+        )
 
         try {
-            routeOptions = gtfsRepository.findBestRouteOptions(
-                startLat = userLocation.lat,
-                startLon = userLocation.lon,
+            routeOptions = gtfsRepository.findComplexRouteOptions(
+                startLat = currentLocation.lat,
+                startLon = currentLocation.lon,
                 destLat = destination.lat,
                 destLon = destination.lon
             )
             android.util.Log.d("ROUTING", "Found ${routeOptions.size} route options.")
             routeOptions.forEachIndexed { i, opt ->
-                android.util.Log.d("ROUTING", "Option $i: Bus ${opt.routeShortName} from ${opt.startStop.stopName} to ${opt.endStop.stopName} (${opt.totalMinutes} min)")
+                android.util.Log.d(
+                    "ROUTING",
+                    "Option $i: ${opt.segments.size} segment(s), from ${opt.segments.first().fromStop.stopName} to ${opt.segments.last().toStop.stopName} (${opt.totalMinutes} min)"
+                )
             }
         } catch (e: Exception) {
             android.util.Log.e("ROUTING", "Error finding GTFS routes", e)
             routeOptions = emptyList()
+        } finally {
+            isLoadingRoutes = false
         }
-
-        isLoadingRoutes = false
+    }
+    LaunchedEffect(routeOptions) {
+        if (routeOptions.isNotEmpty() && selectedRouteIndex !in routeOptions.indices) {
+            selectedRouteIndex = 0
+        }
     }
     LaunchedEffect(fromPoint, toPoint) {
+        if (fromPoint == null) {
+            routeData = null
+            return@LaunchedEffect
+        }
+
         routeData = try {
             repository.getRouteData(
                 fromLat = fromPoint.latitude,
@@ -1208,18 +1327,107 @@ fun SuggestedRoutesScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         FromToCard(
-            from = "Your location",
+            from = if (userLocation != null) "Your location"
+            else if (usedTestLocation != null) "Grand Hotel Plovdiv (test)"
+            else "Location not found",
             to = destination?.name ?: "Central Station"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (effectiveLocation == null) {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Location not found",
+                        color = Color(0xFF0F172A),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Use Grand Hotel Plovdiv as a test starting point to load route options.",
+                        color = Color(0xFF64748B),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = {
+                            usedTestLocation = GRAND_HOTEL_PLOVDIV
+                        },
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Use Grand Hotel for testing")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        val selectedLine = routeOptions
+            .getOrNull(selectedRouteIndex)
+            ?.segments
+            ?.firstOrNull()
+            ?.routeShortName
+            ?.trim()
+
+        val selectedLiveVehicles = if (!selectedLine.isNullOrBlank()) {
+            val normalizedSelected = selectedLine.filter { it.isDigit() }
+
+            liveVehicles.filter { vehicle ->
+                val normalizedVehicleLine = vehicle.line.filter { it.isDigit() }
+                normalizedVehicleLine == normalizedSelected
+            }
+        } else {
+            emptyList()
+        }
+
+        LaunchedEffect(routeOptions, selectedRouteIndex, liveVehicles) {
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "routeOptions=${routeOptions.size}, selectedIndex=$selectedRouteIndex, selectedLine=$selectedLine, matched=${selectedLiveVehicles.size}, liveTotal=${liveVehicles.size}"
+            )
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "live lines sample=${liveVehicles.map { it.line }.distinct().sorted().take(50)}"
+            )
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "live vehicles sample=${liveVehicles.take(20).map { "${it.vehicleId}:${it.line}" }}"
+            )
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "selected line raw='$selectedLine'"
+            )
+
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "route option lines=    ${routeOptions.mapNotNull { it.segments.firstOrNull()?.routeShortName }}"
+            )
+
+            android.util.Log.d(
+                "LIVE_FILTER",
+                "live lines sample=${liveVehicles.map { it.line }.distinct().take(20)}"
+            )
+        }
         RouteMapPreview(
             destination = destination,
-            userLocation = userLocation,
+            userLocation = effectiveLocation,
             routeData = routeData,
             selectedRoute = routeOptions.getOrNull(selectedRouteIndex),
-            gtfsRepository = gtfsRepository
+            gtfsRepository = gtfsRepository,
+            liveVehicles = selectedLiveVehicles
         )
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -1241,15 +1449,14 @@ fun SuggestedRoutesScreen(
             )
         } else if (routeOptions.isEmpty()) {
             Text(
-                text = "No direct routes found nearby.",
+                text = "No route options found nearby.",
                 color = Color(0xFF64748B),
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
             val fastestIndex = routeOptions.indices.minByOrNull { routeOptions[it].totalMinutes } ?: -1
             val lessWalkingIndex = routeOptions.indices.minByOrNull {
-                routeOptions[it].walkToStopMinutes + routeOptions[it].walkToDestMinutes
-            } ?: -1
+                routeOptions[it].walkToFirstStopMinutes + routeOptions[it].walkToFinalDestMinutes            } ?: -1
             routeOptions.forEachIndexed { index, option ->
                 val isSelected = index == selectedRouteIndex
                 val badge = when {
@@ -1258,35 +1465,86 @@ fun SuggestedRoutesScreen(
                     else -> "Alternative"
                 }
 
+                val steps = mutableListOf<RouteStep>()
+
+                steps.add(
+                    RouteStep.Walk(
+                        text = "Walk to ${option.segments.first().fromStop.stopName}",
+                        time = "${option.walkToFirstStopMinutes} мин"
+                    )
+                )
+
+                option.segments.forEachIndexed { segmentIndex, segment ->
+                    steps.add(
+                        RouteStep.Bus(
+                            text = "Bus ${segment.routeShortName} to ${segment.toStop.stopName}",
+                            time = "${minutesBetweenTimes(segment.departureTime, segment.arrivalTime).coerceAtLeast(2)} min",
+                            line = segment.routeShortName
+                        )
+                    )
+
+                    if (segmentIndex < option.segments.size - 1) {
+                        steps.add(
+                            RouteStep.Walk(
+                                text = "Transfer at ${segment.toStop.stopName}",
+                                time = "Wait ~10 min"
+                            )
+                        )
+                    }
+                }
+
+                steps.add(
+                    RouteStep.Walk(
+                        text = "Walk to destination",
+                        time = "${option.walkToFinalDestMinutes} min"
+                    )
+                )
+
                 RouteOptionCard(
                     badge = badge,
                     duration = "${option.totalMinutes} min",
+                    steps = steps,
                     isSelected = isSelected,
-                    steps = listOf(
-                        RouteStep.Walk(
-                            text = "Walk to ${option.startStop.stopName}",
-                            time = "${option.walkToStopMinutes} min"
-                        ),
-                        RouteStep.Bus(
-                            text = "Bus ${option.routeShortName} to ${option.endStop.stopName}",
-                            time = "${option.busMinutes} min",
-                            line = option.routeShortName
-                        ),
-                        RouteStep.Walk(
-                            text = "Walk to destination",
-                            time = "${option.walkToDestMinutes} min"
-                        )
-                    ),
+                    onSelect = {
+                        selectedRouteIndex = index
+                    },
                     onGo = {
                         selectedRouteIndex = index
+                        onRouteSelected(option)
+                        onGo()
                     }
                 )
-
-                if (index != routeOptions.lastIndex) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
             }
         }
+    }
+    if (showLocationDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showLocationDialog = false },
+            title = { Text("Location not found") },
+            text = {
+                Text(
+                    "Your current location could not be determined. Start the route from Grand Hotel Plovdiv for testing?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        usedTestLocation = GRAND_HOTEL_PLOVDIV
+                        showLocationDialog = false
+                        onGo()
+                    }
+                ) {
+                    Text("Start from Grand Hotel")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLocationDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -1390,10 +1648,11 @@ fun RouteOptionCard(
     duration: String,
     steps: List<RouteStep>,
     isSelected: Boolean = false,
+    onSelect: () -> Unit,
     onGo: () -> Unit
-) {
+){
     Card(
-        onClick = onGo,
+        onClick = onSelect,
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFFEFF6FF) else Color.White
@@ -1522,7 +1781,6 @@ fun StepRowWalk(
         }
     }
 }
-
 @Composable
 fun StepRowBus(
     text: String,
@@ -1566,8 +1824,35 @@ fun StepRowBus(
 }
 @Composable
 fun GoScreen(
+    selectedRoute: RouteOption?,
+    destination: PlaceSearchResult?,
+    userLocation: UserLocation?,
     onBack: () -> Unit = {}
 ) {
+    val firstSegment = selectedRoute?.segments?.firstOrNull()
+    val totalSteps = if (selectedRoute == null) 0 else selectedRoute.segments.size + 2
+
+    val walkTargetName = firstSegment?.fromStop?.stopName ?: "Stop not available"
+    val busLine = firstSegment?.routeShortName ?: "-"
+    val busDestination = firstSegment?.toStop?.stopName ?: (destination?.name ?: "Destination")
+
+    val walkDistanceMeters = if (userLocation != null && firstSegment != null) {
+        distanceBetween(
+            userLocation.lat,
+            userLocation.lon,
+            firstSegment.fromStop.stopLat,
+            firstSegment.fromStop.stopLon
+        )
+    } else {
+        0.0
+    }
+
+    val walkMinutesValue = walkingMinutes(walkDistanceMeters)
+    val rideMinutes = if (firstSegment != null) {
+        minutesBetweenTimes(firstSegment.departureTime, firstSegment.arrivalTime).coerceAtLeast(2)
+    } else {
+        0
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1610,20 +1895,57 @@ fun GoScreen(
         }
 
         Spacer(modifier = Modifier.height(18.dp))
+        if (selectedRoute == null) {
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF334155)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "No active route",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Go back to Suggested routes and choose a route first.",
+                        color = Color(0xFFCBD5E1),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            return@Column
+        }
 
         LiveGuidanceMapCard()
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        CurrentStepCard()
+        CurrentStepCard(
+            stepLabel = "Step 1 of $totalSteps",
+            title = "Walk to the stop",
+            subtitle = "Head to $walkTargetName",
+            distanceText = "${walkDistanceMeters.toInt()}m",
+            timeText = "$walkMinutesValue min"
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        NextStepCard()
+        NextStepCard(
+            line = busLine,
+            title = "Take Bus $busLine to $busDestination",
+            subtitle = "Ride time about $rideMinutes min"
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        SmartAlertCard()
+        SmartAlertCard(
+            text = "Live bus tracking and stop alerts will be connected to the selected route next."
+        )
     }
 }
 @Composable
@@ -1716,7 +2038,13 @@ fun LiveGuidanceMapCard() {
 }
 
 @Composable
-fun CurrentStepCard() {
+fun CurrentStepCard(
+    stepLabel: String,
+    title: String,
+    subtitle: String,
+    distanceText: String,
+    timeText: String
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF334155)),
@@ -1746,7 +2074,7 @@ fun CurrentStepCard() {
 
                 Column {
                     Text(
-                        text = "Step 1 of 3",
+                        text = stepLabel,
                         color = Color(0xFFCBD5E1),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -1754,7 +2082,7 @@ fun CurrentStepCard() {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Walk to the stop",
+                        text = title,
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
@@ -1763,7 +2091,7 @@ fun CurrentStepCard() {
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Head to Bus Stop Opera",
+                        text = subtitle,
                         color = Color(0xFFE2E8F0),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -1791,7 +2119,7 @@ fun CurrentStepCard() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "240m",
+                            text = distanceText,
                             color = Color.White,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
@@ -1808,7 +2136,7 @@ fun CurrentStepCard() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "3 min",
+                            text = timeText,
                             color = Color.White,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
@@ -1821,7 +2149,11 @@ fun CurrentStepCard() {
 }
 
 @Composable
-fun NextStepCard() {
+fun NextStepCard(
+    line: String,
+    title: String,
+    subtitle: String
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF334155)),
@@ -1848,7 +2180,7 @@ fun NextStepCard() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "19",
+                        text = line,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
@@ -1858,7 +2190,7 @@ fun NextStepCard() {
 
                 Column {
                     Text(
-                        text = "Take Bus 19 to Central Station",
+                        text = title,
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
@@ -1867,7 +2199,7 @@ fun NextStepCard() {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Bus arrives in 5 min",
+                        text = subtitle,
                         color = Color(0xFFCBD5E1),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -1878,7 +2210,9 @@ fun NextStepCard() {
 }
 
 @Composable
-fun SmartAlertCard() {
+fun SmartAlertCard(
+    text: String
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0B3B3C)),
@@ -1899,7 +2233,7 @@ fun SmartAlertCard() {
 
             Column {
                 Text(
-                    text = "Smart alert active",
+                    text = "Trip status",
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
@@ -1908,7 +2242,7 @@ fun SmartAlertCard() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "We'll notify you when Bus 19 is approaching and when it's time to get off",
+                    text = text,
                     color = Color(0xFFD1FAE5),
                     style = MaterialTheme.typography.bodyMedium
                 )
