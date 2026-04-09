@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,7 +44,7 @@ fun HomeScreen(
             .padding(20.dp)
     ) {
         Text(
-            text = "Home",
+            text = "Welcome, Oleksandr",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF0F172A)
@@ -54,7 +53,7 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Live buses around you",
+            text = "Where are we heading next?",
             style = MaterialTheme.typography.bodyLarge,
             color = Color(0xFF64748B)
         )
@@ -98,7 +97,7 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         Text(
-            text = "Nearby buses",
+            text = "Live buses nearby",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF0F172A)
@@ -174,7 +173,7 @@ fun SearchCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Text(
-                text = "Where to?",
+                text = "Search destination",
                 color = Color(0xFF64748B),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
@@ -246,7 +245,7 @@ fun MapPreviewCard(
             }
 
             Text(
-                text = "Your location: Central Plovdiv",
+                text = "Ready to start from your current location",
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 color = Color(0xFF64748B),
                 style = MaterialTheme.typography.bodyMedium
