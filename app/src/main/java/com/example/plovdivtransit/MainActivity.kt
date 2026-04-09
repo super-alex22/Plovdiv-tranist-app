@@ -923,86 +923,82 @@ fun RouteMapScreen(
         update = { mapView ->
             mapView.overlays.clear()
 
-            val firstSegment = selectedRoute?.segments?.firstOrNull()
+            if (fromPoint == null) return@AndroidView
 
-            if (firstSegment != null) {
-                android.util.Log.d(
-                    "ROUTING",
-                    "Rendering selected route: Bus ${firstSegment.routeShortName}"
-                )
+            val segments = selectedRoute?.segments ?: emptyList()
 
-                val startStop = GeoPoint(
-                    firstSegment.fromStop.stopLat,
-                    firstSegment.fromStop.stopLon
-                )
-                val endStop = GeoPoint(
-                    firstSegment.toStop.stopLat,
-                    firstSegment.toStop.stopLon
-                )
+            if (segments.isNotEmpty()) {
+                var currentPoint = fromPoint
 
-                val walk1 = Polyline().apply {
-                    setPoints(listOf(fromPoint, startStop))
-                    outlinePaint.color = android.graphics.Color.GRAY
-                    outlinePaint.strokeWidth = 4f
-                    outlinePaint.pathEffect =
-                        android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                }
+                segments.forEach { segment ->
+                    val startStop = GeoPoint(
+                        segment.fromStop.stopLat,
+                        segment.fromStop.stopLon
+                    )
 
-                val busPoints =
-                    if (gtfsRepository != null && firstSegment.shapeId != null) {
-                        val points = gtfsRepository.getShapePoints(
-                            firstSegment.shapeId,
-                            firstSegment.fromStop,
-                            firstSegment.toStop
-                        )
-                        android.util.Log.d(
-                            "ROUTING",
-                            "Found ${points.size} shape points for shapeId ${firstSegment.shapeId}"
-                        )
-                        points
-                    } else {
-                        android.util.Log.d(
-                            "ROUTING",
-                            "No shapeId or repository, using direct stop-to-stop line."
-                        )
-                        emptyList()
+                    val endStop = GeoPoint(
+                        segment.toStop.stopLat,
+                        segment.toStop.stopLon
+                    )
+
+                    val walkToStop = Polyline().apply {
+                        setPoints(listOf(currentPoint, startStop))
+                        outlinePaint.color = android.graphics.Color.GRAY
+                        outlinePaint.strokeWidth = 4f
+                        outlinePaint.pathEffect =
+                            android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    }
+                    mapView.overlays.add(walkToStop)
+
+                    val busPoints =
+                        if (gtfsRepository != null && segment.shapeId != null) {
+                            gtfsRepository.getShapePoints(
+                                segment.shapeId,
+                                segment.fromStop,
+                                segment.toStop
+                            )
+                        } else {
+                            emptyList()
+                        }
+
+                    val busLine = Polyline().apply {
+                        setPoints(if (busPoints.isNotEmpty()) busPoints else listOf(startStop, endStop))
+                        outlinePaint.color = android.graphics.Color.parseColor("#3B82F6")
+                        outlinePaint.strokeWidth = 10f
+                    }
+                    mapView.overlays.add(busLine)
+
+                    val pickupMarker = Marker(mapView).apply {
+                        position = startStop
+                        title = "Pickup: ${segment.fromStop.stopName} (Bus ${segment.routeShortName})"
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
 
-                val busLine = Polyline().apply {
-                    setPoints(if (busPoints.isNotEmpty()) busPoints else listOf(startStop, endStop))
-                    outlinePaint.color = android.graphics.Color.parseColor("#3B82F6")
-                    outlinePaint.strokeWidth = 10f
+                    val dropoffMarker = Marker(mapView).apply {
+                        position = endStop
+                        title = "Dropoff: ${segment.toStop.stopName}"
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    }
+
+                    mapView.overlays.add(pickupMarker)
+                    mapView.overlays.add(dropoffMarker)
+
+                    currentPoint = endStop
                 }
 
-                val walk2 = Polyline().apply {
-                    setPoints(listOf(endStop, toPoint))
+                val finalWalk = Polyline().apply {
+                    setPoints(listOf(currentPoint, toPoint))
                     outlinePaint.color = android.graphics.Color.GRAY
                     outlinePaint.strokeWidth = 4f
                     outlinePaint.pathEffect =
                         android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
+                mapView.overlays.add(finalWalk)
 
-                val startStopMarker = Marker(mapView).apply {
-                    position = startStop
-                    title = "Pickup: ${firstSegment.fromStop.stopName}"
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                }
-
-                val endStopMarker = Marker(mapView).apply {
-                    position = endStop
-                    title = "Dropoff: ${firstSegment.toStop.stopName}"
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                }
-
-                mapView.overlays.add(walk1)
-                mapView.overlays.add(busLine)
-                mapView.overlays.add(walk2)
-                mapView.overlays.add(startStopMarker)
-                mapView.overlays.add(endStopMarker)
             } else {
                 android.util.Log.d(
                     "ROUTING",
-                    "No selected GTFS route. Not drawing any transit line."
+                    "No selected GTFS route. Drawing only markers."
                 )
             }
 
@@ -1822,6 +1818,7 @@ fun StepRowBus(
         }
     }
 }
+
 @Composable
 fun GoScreen(
     selectedRoute: RouteOption?,
@@ -1829,9 +1826,9 @@ fun GoScreen(
     userLocation: UserLocation?,
     onBack: () -> Unit = {}
 ) {
-    val firstSegment = selectedRoute?.segments?.firstOrNull()
+    val segments = selectedRoute?.segments ?: emptyList()
     val totalSteps = if (selectedRoute == null) 0 else selectedRoute.segments.size + 2
-
+    val firstSegment = segments.firstOrNull()
     val walkTargetName = firstSegment?.fromStop?.stopName ?: "Stop not available"
     val busLine = firstSegment?.routeShortName ?: "-"
     val busDestination = firstSegment?.toStop?.stopName ?: (destination?.name ?: "Destination")
@@ -1921,7 +1918,11 @@ fun GoScreen(
             return@Column
         }
 
-        LiveGuidanceMapCard()
+        LiveGuidanceRouteMap(
+            destination = destination,
+            userLocation = userLocation,
+            selectedRoute = selectedRoute
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -1945,6 +1946,32 @@ fun GoScreen(
 
         SmartAlertCard(
             text = "Live bus tracking and stop alerts will be connected to the selected route next."
+        )
+    }
+}
+@Composable
+fun LiveGuidanceRouteMap(
+    destination: PlaceSearchResult?,
+    userLocation: UserLocation?,
+    selectedRoute: RouteOption?
+) {
+    val context = LocalContext.current
+    val gtfsRepository = remember { GtfsRepository(context) }
+
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(214.dp)
+    ) {
+        RouteMapScreen(
+            destination = destination,
+            userLocation = userLocation,
+            routeData = null,
+            selectedRoute = selectedRoute,
+            gtfsRepository = gtfsRepository,
+            liveVehicles = emptyList()
         )
     }
 }
