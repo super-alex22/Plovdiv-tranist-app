@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun HomeScreen(
+    userLocation: UserLocation?,
     onPlanRoute: () -> Unit,
     onUserLocationChanged: (UserLocation) -> Unit
 ) {
@@ -90,6 +91,7 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         MapPreviewCard(
+            userLocation = userLocation,
             onUserLocationChanged = onUserLocationChanged
         )
 
@@ -221,6 +223,7 @@ fun QuickDestinationChip(
 
 @Composable
 fun MapPreviewCard(
+    userLocation: UserLocation?,
     onUserLocationChanged: (UserLocation) -> Unit
 ) {
     Card(
@@ -237,6 +240,7 @@ fun MapPreviewCard(
                     .weight(1f)
             ) {
                 HomeMapScreen(
+                    userLocation = userLocation,
                     onUserLocationChanged = onUserLocationChanged
                 )
             }
