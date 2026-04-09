@@ -12,7 +12,20 @@
           "package_name": "com.example.plovdivtransit"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "346987936734-vh3agoads80bbjrc7ehdutebemc10tu5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.plovdivtransit",
+            "certificate_hash": "9d0a7c54cf06721d589607f5900e0be21bafb9c9"
+          }
+        },
+        {
+          "client_id": "346987936734-llatf30cafhrg7otrvmmalhoc0c4fgkh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCkObLqKp9c6PpqMIqqPbr3E0O2AJwEXtc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "346987936734-llatf30cafhrg7otrvmmalhoc0c4fgkh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
